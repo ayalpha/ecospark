@@ -1,0 +1,148 @@
+// src/App.jsx
+import React, { useEffect } from 'react';
+import { Routes, Route, Navigate } from 'react-router-dom';
+import { onAuthStateChanged } from 'firebase/auth';
+import { auth } from './lib/firebase';
+import { useAuthStore } from './store/authStore';
+import { useUiStore } from './store/uiStore';
+import { subscribeUserProfile } from './services/firestoreService';
+
+import AppShell from './components/layout/AppShell';
+import ProtectedRoute from './components/common/ProtectedRoute';
+
+// Pages (lazy-loaded)
+const Home = React.lazy(() => import('./pages/Home'));
+const Auth = React.lazy(() => import('./pages/Auth'));
+const Tasks = React.lazy(() => import('./pages/Tasks'));
+const Leaderboard = React.lazy(() => import('./pages/Leaderboard'));
+const Rewards = React.lazy(() => import('./pages/Rewards'));
+const Community = React.lazy(() => import('./pages/Community'));
+const Profile = React.lazy(() => import('./pages/Profile'));
+const Settings = React.lazy(() => import('./pages/Settings'));
+const Admin = React.lazy(() => import('./pages/Admin'));
+const About = React.lazy(() => import('./pages/About'));
+
+function LoadingScreen() {
+  return (
+    <div style={{
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      minHeight: '100vh',
+      background: 'var(--color-bg)',
+      flexDirection: 'column',
+      gap: '20px',
+    }}>
+      <div style={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        gap: '12px',
+        animation: 'float 3s ease-in-out infinite',
+      }}>
+        <img 
+          src="/logo-8k.jpeg" 
+          alt="EcoSpark Logo" 
+          style={{ 
+            width: '72px', 
+            height: '72px', 
+            borderRadius: '16px', 
+            objectFit: 'cover',
+            boxShadow: 'var(--elevation-2)'
+          }} 
+        />
+        <span style={{
+          fontFamily: 'var(--font-display)',
+          fontSize: 'var(--text-2xl)',
+          fontWeight: 'var(--font-extrabold)',
+          background: 'linear-gradient(135deg, var(--color-primary), var(--color-secondary))',
+          WebkitBackgroundClip: 'text',
+          WebkitTextFillColor: 'transparent',
+          backgroundClip: 'text',
+          letterSpacing: '-0.02em',
+        }}>
+          EcoSpark
+        </span>
+      </div>
+      <p style={{ color: 'var(--color-text-secondary)', fontFamily: 'var(--font-body)', fontSize: 'var(--text-sm)' }}>
+        Loading experience...
+      </p>
+    </div>
+  );
+}
+
+export default function App() {
+  const { setUser, setProfile, setLoading, loading } = useAuthStore();
+  const { setTheme, setReducedMotion, setTextSize, setHighContrast } = useUiStore();
+
+  // Apply saved preferences on mount
+  useEffect(() => {
+    const theme = localStorage.getItem('ecospark-theme') || 'forest';
+    const reducedMotion = localStorage.getItem('ecospark-reduced-motion') === 'true'
+      || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    const textSize = localStorage.getItem('ecospark-text-size') || 'normal';
+    const highContrast = localStorage.getItem('ecospark-high-contrast') === 'true';
+
+    setTheme(theme);
+    setReducedMotion(reducedMotion);
+    setTextSize(textSize);
+    setHighContrast(highContrast);
+  }, []);
+
+  // Firebase Auth listener
+  useEffect(() => {
+    let unsubProfile = null;
+
+    const unsubAuth = onAuthStateChanged(auth, (firebaseUser) => {
+      setUser(firebaseUser);
+
+      if (firebaseUser) {
+        // Subscribe to live profile updates
+        unsubProfile = subscribeUserProfile(firebaseUser.uid, (profile) => {
+          setProfile(profile);
+          setLoading(false);
+        });
+      } else {
+        unsubProfile?.();
+        setProfile(null);
+        setLoading(false);
+      }
+    });
+
+    return () => {
+      unsubAuth();
+      unsubProfile?.();
+    };
+  }, []);
+
+  if (loading) return <LoadingScreen />;
+
+  return (
+    <React.Suspense fallback={<LoadingScreen />}>
+      <Routes>
+        <Route path="/auth" element={<Auth />} />
+        <Route
+          path="/*"
+          element={
+            <ProtectedRoute>
+              <AppShell>
+                <Routes>
+                  <Route path="/" element={<Home />} />
+                  <Route path="/tasks" element={<Tasks />} />
+                  <Route path="/leaderboard" element={<Leaderboard />} />
+                  <Route path="/rewards" element={<Rewards />} />
+                  <Route path="/community" element={<Community />} />
+                  <Route path="/profile" element={<Profile />} />
+                  <Route path="/settings" element={<Settings />} />
+                  <Route path="/admin" element={<Admin />} />
+                  <Route path="/about" element={<About />} />
+                  <Route path="*" element={<Navigate to="/" replace />} />
+                </Routes>
+              </AppShell>
+            </ProtectedRoute>
+          }
+        />
+      </Routes>
+    </React.Suspense>
+  );
+}

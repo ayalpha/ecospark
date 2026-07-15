@@ -1,0 +1,100 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+
+    function isTeacher() {
+      return isAuthenticated() &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['teacher', 'admin'];
+    }
+
+    // ── USERS ──────────────────────────────────────────────────────────────
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow create: if isOwner(userId);
+      allow update: if isOwner(userId) || isTeacher();
+      allow delete: if false;
+    }
+
+    // ── TASKS (read-only for users, managed by seed script) ───────────────
+    match /tasks/{taskId} {
+      allow read: if isAuthenticated();
+      allow write: if false; // Only seeded via admin SDK
+    }
+
+    // ── SUBMISSIONS ────────────────────────────────────────────────────────
+    match /submissions/{submissionId} {
+      allow read: if isAuthenticated() &&
+        (resource.data.userId == request.auth.uid || isTeacher());
+      allow create: if isAuthenticated() &&
+        request.resource.data.userId == request.auth.uid;
+      // Updates come from server-side only (verify serverless function)
+      allow update: if isAuthenticated() &&
+        (resource.data.userId == request.auth.uid || isTeacher());
+      allow delete: if false;
+    }
+
+    // ── LEADERBOARD (public read, server-side write) ──────────────────────
+    match /leaderboard/{userId} {
+      allow read: if isAuthenticated();
+      allow write: if isOwner(userId) || isTeacher(); // Also updated by awardPointsAndUpdateStreak transaction
+    }
+
+    // ── REWARDS (read-only for users) ─────────────────────────────────────
+    match /rewards/{rewardId} {
+      allow read: if isAuthenticated();
+      allow write: if false;
+    }
+
+    // ── REDEMPTIONS ────────────────────────────────────────────────────────
+    match /redemptions/{redemptionId} {
+      allow read: if isAuthenticated() &&
+        resource.data.userId == request.auth.uid;
+      allow create: if isAuthenticated() &&
+        request.resource.data.userId == request.auth.uid;
+      allow update, delete: if false;
+    }
+
+    // ── COMMUNITY POSTS ────────────────────────────────────────────────────
+    match /community/{postId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() &&
+        request.resource.data.userId == request.auth.uid;
+      allow update: if isAuthenticated() &&
+        (resource.data.userId == request.auth.uid ||
+         // Allow any authenticated user to update likes array only
+         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likes']));
+      allow delete: if isAuthenticated() &&
+        resource.data.userId == request.auth.uid;
+    }
+
+    // ── GROUPS ────────────────────────────────────────────────────────────
+    match /groups/{groupId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated() &&
+        (resource.data.creatorId == request.auth.uid ||
+         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['members', 'totalPoints']));
+      allow delete: if false;
+    }
+
+    // ── NOTIFICATIONS ─────────────────────────────────────────────────────
+    match /notifications/{notifId} {
+      allow read: if isAuthenticated() &&
+        resource.data.userId == request.auth.uid;
+      allow update: if isAuthenticated() &&
+        resource.data.userId == request.auth.uid &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']);
+      allow create, delete: if false; // Server-side only
+    }
+  }
+}
