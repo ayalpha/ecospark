@@ -64,6 +64,15 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    // ── TRANSACTIONS ───────────────────────────────────────────────────────
+    match /transactions/{transactionId} {
+      allow read: if isAuthenticated() &&
+        (resource.data.userId == request.auth.uid || isTeacher());
+      allow create: if isAuthenticated() &&
+        (request.resource.data.userId == request.auth.uid || isTeacher());
+      allow update, delete: if isTeacher();
+    }
+
     // ── COMMUNITY POSTS ────────────────────────────────────────────────────
     match /community/{postId} {
       allow read: if isAuthenticated();
