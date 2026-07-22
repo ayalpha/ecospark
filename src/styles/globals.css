@@ -1,4 +1,4 @@
-@import './tokens.css';
+
 
 /* ============================================================
    EcoSpark Global Styles
@@ -24,6 +24,7 @@ body {
   line-height: var(--line-normal);
   color: var(--color-text);
   background-color: var(--color-bg);
+  background-image: var(--bg-image, none);
   min-height: 100vh;
   overflow-x: hidden;
   transition: background-color var(--transition-standard), color var(--transition-standard);
@@ -68,13 +69,20 @@ p {
   color: var(--color-text-secondary);
 }
 
-a {
+/* App links only, landing page uses Tailwind */
+:not(.landing-container) > a,
+.app-wrapper a,
+.auth-container a {
   color: var(--color-primary);
   text-decoration: none;
   transition: color var(--transition-micro);
 }
 
-a:hover { color: var(--color-primary-light); }
+:not(.landing-container) > a:hover,
+.app-wrapper a:hover,
+.auth-container a:hover { 
+  color: var(--color-primary-light); 
+}
 
 /* ============================================================
    SCROLLBAR

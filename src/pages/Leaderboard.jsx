@@ -1,68 +1,134 @@
 // src/pages/Leaderboard.jsx
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { Link } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
+import { useSettingsStore } from '../store/settingsStore';
+import Avatar from '../components/common/Avatar';
 import { subscribeLeaderboard } from '../services/firestoreService';
+import { useUser } from '../lib/useUser';
+import { GoldMedal, SilverMedal, BronzeMedal } from '../components/common/Medals';
+import PremiumIcon from '../components/common/PremiumIcon';
+import { Flame, Zap, Trophy, AlertTriangle, Leaf } from 'lucide-react';
 import styles from './Leaderboard.module.css';
 
 const RANK_STYLE = {
-  1: { bg: 'linear-gradient(135deg, #F59E0B, #FBBF24)', glow: 'var(--glow-gold)', icon: '🥇' },
-  2: { bg: 'linear-gradient(135deg, #9CA3AF, #D1D5DB)', glow: '0 0 16px rgba(156,163,175,0.5)', icon: '🥈' },
-  3: { bg: 'linear-gradient(135deg, #CD7F32, #B8864E)', glow: '0 0 16px rgba(205,127,50,0.5)', icon: '🥉' },
+  1: { bg: 'linear-gradient(135deg, #F59E0B, #FBBF24)', glow: 'var(--glow-gold)', icon: <GoldMedal size={32} /> },
+  2: { bg: 'linear-gradient(135deg, #9CA3AF, #D1D5DB)', glow: '0 0 16px rgba(156,163,175,0.5)', icon: <SilverMedal size={28} /> },
+  3: { bg: 'linear-gradient(135deg, #CD7F32, #B8864E)', glow: '0 0 16px rgba(205,127,50,0.5)', icon: <BronzeMedal size={28} /> },
 };
 
-function LeaderboardRow({ entry, myId, index }) {
+function LeaderboardRow({ entry, myId, index, tab }) {
+  const liveUser = useUser(entry.userId);
   const isMe = entry.userId === myId;
   const style = RANK_STYLE[entry.rank];
+  
+  const streak = liveUser ? liveUser.streak : entry.streak;
+  const weeklyPoints = liveUser ? liveUser.weeklyPoints : entry.weeklyPoints;
+  const photoURL = liveUser ? liveUser.photoURL : entry.photoURL;
+  const displayName = liveUser ? liveUser.displayName : entry.displayName;
+
+  const displayValue = tab === 'streak'
+    ? <><PremiumIcon icon={Flame} color="ruby" size={16} className="mr-1" /> {streak || 0} Days</>
+    : `${(weeklyPoints || 0).toLocaleString()} pts`;
 
   return (
-    <motion.div
-      className={`${styles.row} ${isMe ? styles.myRow : ''}`}
-      initial={{ opacity: 0, x: -20 }}
-      animate={{ opacity: 1, x: 0 }}
-      transition={{ delay: index * 0.04 }}
-      layout
-      style={isMe ? { boxShadow: 'var(--glow-primary)' } : {}}
-    >
-      {/* Rank */}
-      <div
-        className={styles.rank}
-        style={style ? { background: style.bg, boxShadow: style.glow } : {}}
+    <Link to={`/user/${entry.userId}`} style={{ textDecoration: 'none' }}>
+      <motion.div
+        className={`${styles.row} ${isMe ? styles.myRow : ''} ${entry.rank <= 3 ? styles[`topRow${entry.rank}`] : ''}`}
+        initial={{ opacity: 0, x: -20 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ delay: index * 0.04 }}
+        layout
+        style={isMe && entry.rank > 3 ? { boxShadow: 'var(--glow-primary)' } : {}}
       >
-        {style ? style.icon : entry.rank}
-      </div>
+        {/* Rank */}
+        <div
+          className={styles.rank}
+          style={style && entry.rank > 3 ? { background: style.bg, boxShadow: style.glow } : {}}
+        >
+          {entry.rank <= 3 ? (
+            RANK_STYLE[entry.rank].icon
+          ) : (
+            style ? style.icon : entry.rank
+          )}
+        </div>
 
-      {/* Avatar */}
-      <div className={styles.avatar}>
-        {entry.photoURL
-          ? <img src={entry.photoURL} alt={entry.displayName} />
-          : <span>{(entry.displayName || '?')[0].toUpperCase()}</span>
-        }
-      </div>
+        {/* Avatar */}
+        <div className={styles.avatar}>
+          <Avatar 
+            src={photoURL} 
+            activeFrame={liveUser?.activeFrame || entry.activeFrame} 
+            size={entry.rank === 1 ? 64 : entry.rank <= 3 ? 56 : 40} 
+            alt={displayName} 
+          />
+        </div>
 
-      {/* Name */}
-      <div className={styles.nameBlock}>
-        <p className={styles.name}>
-          {entry.displayName || 'EcoUser'}
-          {isMe && <span className={styles.youBadge}>You</span>}
-        </p>
-        <p className={styles.streak}>🔥 {entry.streak || 0} day streak</p>
-      </div>
+        {/* Name */}
+        <div className={styles.nameBlock}>
+          <p className={styles.name}>
+            {displayName || 'EcoUser'}
+            {isMe && <span className={styles.youBadge}>You</span>}
+          </p>
+          <p className={styles.streak} style={{display:'flex', alignItems:'center', gap:'4px'}}><PremiumIcon icon={Flame} color="ruby" size={12} /> {streak || 0} day streak</p>
+        </div>
 
-      {/* Points */}
-      <div className={styles.pointsBlock}>
-        <span className={`${styles.points} ${entry.rank <= 3 ? styles.topPoints : ''}`}>
-          {(entry.points || 0).toLocaleString()}
-        </span>
-        <span className={styles.ptLabel}>pts</span>
-      </div>
-    </motion.div>
+        {/* Points / Streak value */}
+        <div className={styles.pointsBlock}>
+          <span className={`${styles.points} ${entry.rank <= 3 ? styles.topPoints : ''}`}>
+            {displayValue}
+          </span>
+        </div>
+      </motion.div>
+    </Link>
+  );
+}
+
+function PodiumSlot({ entry, index, tab }) {
+  const liveUser = useUser(entry.userId);
+  const streak = liveUser ? liveUser.streak : entry.streak;
+  const weeklyPoints = liveUser ? liveUser.weeklyPoints : entry.weeklyPoints;
+  const photoURL = liveUser ? liveUser.photoURL : entry.photoURL;
+  const displayName = liveUser ? liveUser.displayName : entry.displayName;
+
+  return (
+    <Link to={`/user/${entry.userId}`} style={{ textDecoration: 'none' }}>
+      <motion.div
+        className={`${styles.podiumSlot} ${index === 1 ? styles.podiumFirst : ''}`}
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: index * 0.1 }}
+      >
+        <div className={styles.podiumAvatar}>
+          <Avatar 
+            src={photoURL} 
+            activeFrame={liveUser?.activeFrame || entry.activeFrame} 
+            size={index === 1 ? 72 : 56} 
+            alt={displayName} 
+          />
+        </div>
+        <div className={styles.podiumName}>{displayName || 'EcoUser'}</div>
+        <div className={styles.podiumPts}>
+          {tab === 'streak'
+            ? <span style={{display:'flex', alignItems:'center', gap:'4px', justifyContent:'center'}}><PremiumIcon icon={Flame} color="ruby" size={14} /> {streak || 0} Days</span>
+            : `${(weeklyPoints || 0).toLocaleString()} pts`}
+        </div>
+        <div className={styles.podiumBar} style={{ height: index === 1 ? 80 : 60, overflow: 'visible' }}>
+          <div style={{ marginTop: '-40px' }}>
+            {entry.rank === 1 ? <GoldMedal size={48} /> : 
+             entry.rank === 2 ? <SilverMedal size={40} /> : 
+             <BronzeMedal size={40} />}
+          </div>
+        </div>
+      </motion.div>
+    </Link>
   );
 }
 
 export default function Leaderboard() {
   const { user } = useAuthStore();
-  const [tab, setTab] = useState('global');
+  const { settings } = useSettingsStore();
+  const [tab, setTab] = useState('weekly');
   const [entries, setEntries] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -81,7 +147,12 @@ export default function Leaderboard() {
     return unsub;
   }, [tab]);
 
-  const myRank = entries.findIndex((e) => e.userId === user?.uid) + 1;
+  const bannedUsers = settings?.bannedUsers || [];
+  const displayEntries = entries
+    .filter(e => !bannedUsers.includes(e.userId))
+    .map((e, idx) => ({ ...e, rank: idx + 1 }));
+
+  const myRank = displayEntries.findIndex((e) => e.userId === user?.uid) + 1;
 
   return (
     <div className={styles.page}>
@@ -92,42 +163,30 @@ export default function Leaderboard() {
             <p className={styles.myRank}>Your rank: <strong>#{myRank}</strong></p>
           )}
         </div>
-        <div className={styles.trophy}>🏆</div>
+        <div className={styles.trophy}><PremiumIcon icon={Trophy} color="gold" size={48} /></div>
       </div>
 
       {/* Tabs */}
       <div className={styles.tabs}>
-        {['global', 'group'].map((t) => (
+        {[
+          { key: 'weekly', label: <span style={{display:'flex', alignItems:'center', gap:'6px'}}><PremiumIcon icon={Zap} color="gold" size={16} /> Weekly Points</span> },
+          { key: 'streak', label: <span style={{display:'flex', alignItems:'center', gap:'6px'}}><PremiumIcon icon={Flame} color="ruby" size={16} /> Highest Streak</span> },
+        ].map((t) => (
           <button
-            key={t}
-            className={`${styles.tab} ${tab === t ? styles.tabActive : ''}`}
-            onClick={() => setTab(t)}
+            key={t.key}
+            className={`${styles.tab} ${tab === t.key ? styles.tabActive : ''}`}
+            onClick={() => setTab(t.key)}
           >
-            {t === 'global' ? '🌍 Global' : '👥 My Group'}
+            {t.label}
           </button>
         ))}
       </div>
 
       {/* Top 3 podium (desktop) */}
-      {!loading && entries.length >= 3 && (
+      {!loading && displayEntries.length >= 3 && (
         <div className={styles.podium}>
-          {[entries[1], entries[0], entries[2]].map((e, i) => e && (
-            <motion.div
-              key={e.id}
-              className={`${styles.podiumSlot} ${i === 1 ? styles.podiumFirst : ''}`}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.1 }}
-            >
-              <div className={styles.podiumAvatar}>
-                {e.photoURL ? <img src={e.photoURL} alt={e.displayName} /> : (e.displayName || '?')[0].toUpperCase()}
-              </div>
-              <div className={styles.podiumName}>{e.displayName || 'EcoUser'}</div>
-              <div className={styles.podiumPts}>{(e.points || 0).toLocaleString()} pts</div>
-              <div className={styles.podiumBar} style={{ height: i === 1 ? 80 : 60 }}>
-                {RANK_STYLE[e.rank]?.icon}
-              </div>
-            </motion.div>
+          {[displayEntries[1], displayEntries[0], displayEntries[2]].map((e, i) => e && (
+            <PodiumSlot key={e.id} entry={e} index={i} tab={tab} />
           ))}
         </div>
       )}
@@ -141,23 +200,29 @@ export default function Leaderboard() {
           : error 
           ? (
             <div style={{ padding: '48px 24px', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gap: '16px' }}>
-              <span style={{ fontSize: '3rem' }}>⚠️</span>
+              <PremiumIcon icon={AlertTriangle} color="ruby" size={48} />
               <p style={{ fontWeight: 600, color: 'var(--color-text)', margin: 0 }}>Failed to load leaderboard</p>
               <code style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', background: 'var(--color-surface)', padding: '8px 12px', borderRadius: 8, wordBreak: 'break-all' }}>
                 {error}
               </code>
             </div>
           )
-          : entries.length === 0
+          : displayEntries.length === 0
           ? (
             <div className={styles.empty}>
-              <span>🌱</span>
+              <PremiumIcon icon={Leaf} color="emerald" size={32} />
               <p>No entries yet — be the first!</p>
             </div>
           )
-          : entries.map((e, i) => (
-              <LeaderboardRow key={e.id} entry={e} myId={user?.uid} index={i} />
-            ))
+          : displayEntries.map((e, i) => {
+              const isThirdPlace = e.rank === 3;
+              return (
+                <React.Fragment key={e.id}>
+                  <LeaderboardRow entry={e} myId={user?.uid} index={i} tab={tab} />
+                  {isThirdPlace && <div className={styles.listDivider} />}
+                </React.Fragment>
+              );
+            })
         }
       </div>
     </div>

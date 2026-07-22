@@ -70,11 +70,14 @@
 .nav {
   flex: 1;
   padding: 16px 10px;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
   overflow-y: auto;
   overflow-x: hidden;
+}
+
+.navInner {
+  display: flex;
+  flex-direction: column;
+  gap: 8px; /* Small, consistent gap between items */
 }
 
 .navItem {
@@ -139,10 +142,10 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 10px;
+  padding: 12px 16px;
   border-top: 1px solid var(--color-border);
   gap: 8px;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .userLink {
@@ -152,7 +155,7 @@
   text-decoration: none;
   flex: 1;
   min-width: 0;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .userAvatar {
@@ -167,8 +170,6 @@
   color: white;
   font-size: var(--text-sm);
   flex-shrink: 0;
-  overflow: hidden;
-  border: 2px solid rgba(var(--color-primary-rgb), 0.3);
 }
 
 .userAvatar img {

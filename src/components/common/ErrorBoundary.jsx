@@ -13,6 +13,10 @@ export default class ErrorBoundary extends React.Component {
 
   componentDidCatch(error, info) {
     console.error('[ErrorBoundary]', error, info);
+    // Handle Vite's dynamic import failure by reloading the page automatically
+    if (error && error.message && (error.message.includes('Failed to fetch dynamically imported module') || error.message.includes('Importing a module script failed'))) {
+      window.location.reload();
+    }
   }
 
   render() {

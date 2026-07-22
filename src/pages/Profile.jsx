@@ -7,6 +7,7 @@ import { compressImageToBase64 } from '../lib/imageUtils';
 import { useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
+import Avatar from '../components/common/Avatar';
 import styles from './Profile.module.css';
 
 function WeeklyImpactCard({ profile }) {
@@ -89,6 +90,7 @@ export default function Profile() {
   const { user, profile } = useAuthStore();
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(profile?.displayName || '');
+  const [bio, setBio] = useState(profile?.bio || '');
   const [saving, setSaving] = useState(false);
   const fileInputRef = useRef(null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
@@ -119,7 +121,10 @@ export default function Profile() {
     if (!name.trim() || !user) return;
     setSaving(true);
     try {
-      await updateUserProfile(user.uid, { displayName: name.trim() });
+      await updateUserProfile(user.uid, { 
+        displayName: name.trim(),
+        bio: bio.trim()
+      });
       setEditing(false);
       toast.success('Profile updated!');
     } catch {
@@ -128,6 +133,13 @@ export default function Profile() {
       setSaving(false);
     }
   };
+
+  useEffect(() => {
+    if (!editing && profile) {
+      setName(profile.displayName || '');
+      setBio(profile.bio || '');
+    }
+  }, [profile, editing]);
 
   return (
     <div className={styles.page}>
@@ -139,10 +151,13 @@ export default function Profile() {
           <div className={styles.avatar} onClick={() => !uploadingPhoto && fileInputRef.current?.click()}>
             {uploadingPhoto ? (
               <span className={styles.spinner}>⏳</span>
-            ) : profile?.photoURL ? (
-              <img src={profile.photoURL} alt={profile.displayName} />
             ) : (
-              <span>{(profile?.displayName || '?')[0].toUpperCase()}</span>
+              <Avatar
+                src={profile?.photoURL}
+                activeFrame={profile?.activeFrame}
+                size={96}
+                alt={profile?.displayName}
+              />
             )}
             <div className={styles.avatarOverlay}>
               <span>📷</span>
@@ -162,7 +177,17 @@ export default function Profile() {
               className={styles.nameInput}
               value={name}
               onChange={(e) => setName(e.target.value)}
+              placeholder="Display Name"
               autoFocus
+            />
+            <textarea
+              className={styles.nameInput}
+              value={bio}
+              onChange={(e) => setBio(e.target.value)}
+              placeholder="Write a short bio..."
+              rows={2}
+              maxLength={100}
+              style={{ marginTop: '8px', resize: 'none', height: '60px' }}
             />
             <div className={styles.editActions}>
               <button className={styles.saveBtn} onClick={handleSave} disabled={saving}>
@@ -174,8 +199,11 @@ export default function Profile() {
         ) : (
           <>
             <h2 className={styles.profileName}>{profile?.displayName || 'EcoUser'}</h2>
+            <p className={styles.profileBio} style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--text-sm)', textAlign: 'center', marginTop: '4px', maxWidth: '300px' }}>
+              {profile?.bio || (profile?.role === 'admin' ? '✨ Platform Admin' : 'Sustainability Advocate')}
+            </p>
             <p className={styles.profileEmail}>{user?.email}</p>
-            <button className={styles.editBtn} onClick={() => setEditing(true)}>✏️ Edit name</button>
+            <button className={styles.editBtn} onClick={() => setEditing(true)}>✏️ Edit Profile</button>
           </>
         )}
       </div>
@@ -183,7 +211,7 @@ export default function Profile() {
       {/* Stats */}
       <div className={styles.statsGrid}>
         {[
-          { icon: '⚡', val: (profile?.points || 0).toLocaleString(), label: 'Total Points' },
+          { icon: '⚡', val: (profile?.spendableBalance ?? profile?.points ?? 0).toLocaleString(), label: 'Points' },
           { icon: '🔥', val: profile?.streak || 0, label: 'Current Streak' },
           { icon: '🏆', val: profile?.longestStreak || 0, label: 'Longest Streak' },
           { icon: '✅', val: profile?.totalTasksCompleted || 0, label: 'Tasks Completed' },

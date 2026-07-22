@@ -6,21 +6,39 @@ import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   signInWithPopup,
+  sendPasswordResetEmail,
   updateProfile,
 } from 'firebase/auth';
 import { auth, googleProvider } from '../lib/firebase';
 import { createUserProfile, processReferral } from '../services/firestoreService';
+import { useSettingsStore } from '../store/settingsStore';
 import toast from 'react-hot-toast';
 import styles from './Auth.module.css';
 
 export default function Auth() {
   const [mode, setMode] = useState('signin'); // 'signin' | 'signup'
-  const [form, setForm] = useState({ name: '', email: '', password: '' });
-  const [loading, setLoading] = useState(false);
-  const [errors, setErrors] = useState({});
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const refCode = searchParams.get('ref');
+  const refCode = searchParams.get('ref') || '';
+  const [form, setForm] = useState({ name: '', email: '', password: '', referralCode: refCode });
+  const [loading, setLoading] = useState(false);
+  const [errors, setErrors] = useState({});
+  const { settings } = useSettingsStore();
+
+  const isSignupDisabled = settings?.maintenanceMode || !settings?.allowSignups;
+
+  const handleForgotPassword = async () => {
+    if (!form.email.trim() || !/\S+@\S+\.\S+/.test(form.email)) {
+      toast.error('Please enter your email address first.');
+      return;
+    }
+    try {
+      await sendPasswordResetEmail(auth, form.email);
+      toast.success('Password reset email sent! Check your inbox.');
+    } catch (err) {
+      toast.error(err.code === 'auth/user-not-found' ? 'No account found with that email.' : 'Could not send reset email.');
+    }
+  };
 
   const validate = () => {
     const e = {};
@@ -44,10 +62,23 @@ export default function Auth() {
           email: form.email,
           photoURL: null,
         });
-        if (refCode) await processReferral(cred.user.uid, refCode);
+        if (form.referralCode) await processReferral(cred.user.uid, form.referralCode);
         toast.success('Welcome to EcoSpark! 🌱');
       } else {
-        await signInWithEmailAndPassword(auth, form.email, form.password);
+        const cred = await signInWithEmailAndPassword(auth, form.email, form.password);
+        
+        // Check if banned
+        const { getDoc, doc } = await import('firebase/firestore');
+        const { db } = await import('../lib/firebase');
+        const userDoc = await getDoc(doc(db, 'users', cred.user.uid));
+        
+        if (userDoc.exists() && userDoc.data().banned) {
+          const { signOut } = await import('firebase/auth');
+          await signOut(auth);
+          toast.error('You are banned! This account cannot access EcoSpark.', { duration: 5000 });
+          return;
+        }
+
         toast.success('Welcome back!');
       }
       navigate('/');
@@ -67,6 +98,19 @@ export default function Auth() {
     setLoading(true);
     try {
       const cred = await signInWithPopup(auth, googleProvider);
+      
+      // Check if banned
+      const { getDoc, doc } = await import('firebase/firestore');
+      const { db } = await import('../lib/firebase');
+      const userDoc = await getDoc(doc(db, 'users', cred.user.uid));
+      
+      if (userDoc.exists() && userDoc.data().banned) {
+        const { signOut } = await import('firebase/auth');
+        await signOut(auth);
+        toast.error('You are banned! This account cannot access EcoSpark.', { duration: 5000 });
+        return;
+      }
+
       const isNew = cred._tokenResponse?.isNewUser;
       if (isNew) {
         await createUserProfile(cred.user.uid, {
@@ -74,7 +118,7 @@ export default function Auth() {
           email: cred.user.email,
           photoURL: cred.user.photoURL,
         });
-        if (refCode) await processReferral(cred.user.uid, refCode);
+        if (form.referralCode) await processReferral(cred.user.uid, form.referralCode);
         toast.success('Welcome to EcoSpark! 🌱');
       } else {
         toast.success('Welcome back!');
@@ -128,31 +172,54 @@ export default function Auth() {
           </button>
         </div>
 
-        <AnimatePresence mode="wait">
-          <motion.form
-            key={mode}
-            className={styles.form}
-            onSubmit={handleEmailAuth}
-            initial={{ opacity: 0, x: mode === 'signup' ? 20 : -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: mode === 'signup' ? -20 : 20 }}
-            transition={{ duration: 0.2 }}
-          >
-            {mode === 'signup' && (
-              <div className={styles.field}>
-                <label className={styles.label}>Full Name</label>
-                <input
-                  id="auth-name"
-                  type="text"
-                  className={`${styles.input} ${errors.name ? styles.inputError : ''}`}
-                  placeholder="Your name"
-                  value={form.name}
-                  onChange={(e) => setForm({ ...form, name: e.target.value })}
-                  autoComplete="name"
-                />
-                {errors.name && <p className={styles.error}>{errors.name}</p>}
-              </div>
-            )}
+        {mode === 'signup' && isSignupDisabled ? (
+          <div style={{ textAlign: 'center', padding: '24px', backgroundColor: 'var(--color-bg)', borderRadius: '12px', border: '1px solid var(--color-border)', marginBottom: '24px' }}>
+            <div style={{ fontSize: '32px', marginBottom: '8px' }}>🚧</div>
+            <h3 style={{ color: 'var(--color-text)', margin: '0 0 8px 0', fontFamily: 'var(--font-display)' }}>
+              {settings?.maintenanceMode ? 'System Maintenance' : 'Signups Paused'}
+            </h3>
+            <p style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--text-sm)', margin: 0 }}>
+              {settings?.maintenanceMode 
+                ? 'We are currently undergoing scheduled maintenance. New registrations are temporarily paused.' 
+                : 'We are currently not accepting new user registrations. Please check back later!'}
+            </p>
+          </div>
+        ) : (
+          <form onSubmit={handleEmailAuth} className={styles.form}>
+            <AnimatePresence mode="popLayout">
+              {mode === 'signup' && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                >
+                  <div className={styles.field}>
+                    <label className={styles.label}>Full Name</label>
+                    <input
+                      id="auth-name"
+                      type="text"
+                      className={`${styles.input} ${errors.name ? styles.inputError : ''}`}
+                      placeholder="Your name"
+                      value={form.name}
+                      onChange={(e) => setForm({ ...form, name: e.target.value })}
+                      autoComplete="name"
+                    />
+                    {errors.name && <p className={styles.error}>{errors.name}</p>}
+                  </div>
+                  <div className={styles.field}>
+                    <label className={styles.label}>Referral Code (Optional)</label>
+                    <input
+                      id="auth-referral"
+                      type="text"
+                      className={styles.input}
+                      placeholder="ECO-..."
+                      value={form.referralCode}
+                      onChange={(e) => setForm({ ...form, referralCode: e.target.value })}
+                    />
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
 
             <div className={styles.field}>
               <label className={styles.label}>Email</label>
@@ -180,28 +247,47 @@ export default function Auth() {
                 autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
               />
               {errors.password && <p className={styles.error}>{errors.password}</p>}
+              {mode === 'signin' && (
+                <button
+                  type="button"
+                  onClick={handleForgotPassword}
+                  className={styles.forgotLink}
+                  style={{ background: 'none', border: 'none', color: 'var(--color-primary)', fontSize: 'var(--text-xs)', cursor: 'pointer', padding: '4px 0', marginTop: '4px', textAlign: 'right', width: '100%', fontFamily: 'var(--font-body)' }}
+                >
+                  Forgot Password?
+                </button>
+              )}
             </div>
 
             <motion.button
               type="submit"
               className={styles.submitBtn}
               disabled={loading}
-              whileTap={{ scale: 0.97 }}
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
             >
-              {loading ? '...' : mode === 'signup' ? 'Create Account 🌱' : 'Sign In →'}
+              {loading ? (
+                <span className={styles.spinner} />
+              ) : mode === 'signin' ? (
+                'Sign In'
+              ) : (
+                'Create Account'
+              )}
             </motion.button>
-          </motion.form>
-        </AnimatePresence>
+          </form>
+        )}
 
         {/* Divider */}
         <div className={styles.divider}><span>or</span></div>
 
         {/* Google */}
         <motion.button
+          type="button"
           className={styles.googleBtn}
           onClick={handleGoogleAuth}
-          disabled={loading}
-          whileTap={{ scale: 0.97 }}
+          disabled={loading || (mode === 'signup' && isSignupDisabled)}
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
         >
           <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
             <path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844a4.14 4.14 0 0 1-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.875 2.684-6.615z" fill="#4285F4"/>

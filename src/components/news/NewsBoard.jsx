@@ -4,6 +4,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { fetchGreenNews } from '../../services/newsService';
 import ErrorBoundary from '../common/ErrorBoundary';
 import NewsModal from './NewsModal';
+import PremiumIcon from '../common/PremiumIcon';
+import { Globe, Newspaper, WifiOff, Leaf } from 'lucide-react';
 import styles from './NewsBoard.module.css';
 
 function NewsCardSkeleton() {
@@ -36,7 +38,7 @@ function NewsCard({ article, onClick }) {
           <div className={styles.imgOverlay} />
         </div>
       ) : (
-        <div className={styles.imgPlaceholder}>🌍</div>
+        <div className={styles.imgPlaceholder}><PremiumIcon icon={Globe} color="sapphire" size={32} /></div>
       )}
       <div className={styles.cardBody}>
         <p className={styles.source}>{article.source?.name}</p>
@@ -63,8 +65,8 @@ function NewsBoardInner() {
   return (
     <section className={styles.section}>
       <div className={styles.header}>
-        <h2 className={styles.heading}>
-          <span className={styles.headingIcon}>📰</span>
+        <h2 className={styles.heading} style={{display:'flex', alignItems:'center', gap:'0.5rem'}}>
+          <PremiumIcon icon={Newspaper} size={24} />
           Latest Green News
         </h2>
         {!loading && !error && (
@@ -79,14 +81,14 @@ function NewsBoardInner() {
           : error
           ? (
             <div className={styles.empty}>
-              <span>📡</span>
+              <PremiumIcon icon={WifiOff} color="slate" size={32} />
               <p>News is temporarily unavailable. Check back soon!</p>
             </div>
           )
           : articles.length === 0
           ? (
             <div className={styles.empty}>
-              <span>🌿</span>
+              <PremiumIcon icon={Leaf} color="emerald" size={32} />
               <p>No stories found. Try refreshing later.</p>
             </div>
           )

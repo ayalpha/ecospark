@@ -4,6 +4,8 @@ import { motion } from 'framer-motion';
 import { useUiStore } from '../../store/uiStore';
 import { useAuthStore } from '../../store/authStore';
 import { streamCoachReply } from '../../services/aiService';
+import PremiumIcon from '../common/PremiumIcon';
+import { Leaf, Trash2, X, Timer, Send } from 'lucide-react';
 import styles from './CoachPanel.module.css';
 
 function ChatMessage({ message }) {
@@ -15,7 +17,7 @@ function ChatMessage({ message }) {
       transition={{ duration: 0.2 }}
       className={`${styles.message} ${isUser ? styles.userMessage : styles.assistantMessage}`}
     >
-      {!isUser && <span className={styles.botAvatar}>🌱</span>}
+      {!isUser && <span className={styles.botAvatar}><PremiumIcon icon={Leaf} color="emerald" size={20} /></span>}
       <div className={`${styles.bubble} ${isUser ? styles.userBubble : styles.botBubble}`}>
         {message.content || (message.streaming ? <TypingDots /> : '')}
       </div>
@@ -130,7 +132,7 @@ export default function CoachPanel() {
       {/* Header */}
       <div className={styles.header}>
         <div className={styles.headerInfo}>
-          <div className={styles.headerAvatar}>🌱</div>
+          <div className={styles.headerAvatar}><PremiumIcon icon={Leaf} color="emerald" size={24} /></div>
           <div>
             <h3 className={styles.headerTitle}>EcoSpark Coach</h3>
             <p className={styles.headerSub}>AI-powered sustainability mentor</p>
@@ -138,10 +140,10 @@ export default function CoachPanel() {
         </div>
         <div className={styles.headerActions}>
           <button onClick={clearCoachHistory} className={styles.iconBtn} title="Clear chat">
-            🗑️
+            <PremiumIcon icon={Trash2} color="slate" size={20} />
           </button>
           <button onClick={closeCoach} className={styles.iconBtn} title="Close">
-            ✕
+            <PremiumIcon icon={X} color="slate" size={20} />
           </button>
         </div>
       </div>
@@ -153,7 +155,7 @@ export default function CoachPanel() {
         ))}
         {streaming && coachMessages[coachMessages.length - 1]?.content === '' && (
           <div className={styles.typingIndicator}>
-            <span className={styles.botAvatar}>🌱</span>
+            <span className={styles.botAvatar}><PremiumIcon icon={Leaf} color="emerald" size={20} /></span>
             <div className={styles.typingBubble}><TypingDots /></div>
           </div>
         )}
@@ -193,7 +195,7 @@ export default function CoachPanel() {
           disabled={!input.trim() || streaming}
           aria-label="Send message"
         >
-          {streaming ? '⏳' : '➤'}
+          {streaming ? <PremiumIcon icon={Timer} color="slate" size={16} /> : <PremiumIcon icon={Send} color="emerald" size={16} />}
         </button>
       </div>
     </motion.div>

@@ -91,11 +91,11 @@ export default function Settings() {
           label="Theme"
           value={activeTheme}
           options={[
-            { value: 'forest', label: '🌿 Forest' },
-            { value: 'ocean', label: '🌊 Ocean' },
+            { value: 'metallic', label: '🌑 Metallic Black' },
+            { value: 'forest', label: '🌿 Forest Green' },
+            { value: 'ocean', label: '🌊 Ocean Blue' },
             { value: 'sunset', label: '🌅 Sunset' },
-            { value: 'dark', label: '🌙 Dark' },
-            { value: 'midnight', label: '🌌 Midnight' },
+            { value: 'midnight', label: '🌌 Midnight Dark' },
           ]}
           onChange={setTheme}
         />
@@ -154,8 +154,8 @@ export default function Settings() {
         <h2 className={styles.sectionTitle}>🔒 Privacy</h2>
         <ToggleRow
           icon="🌍"
-          label="Public Profile"
-          desc="Let others view your eco-achievements"
+          label="Show Real Name"
+          desc="When off, other users see your display handle instead of your full name"
           checked={publicProfile}
           onChange={(val) => updateProfileSetting('publicProfile', val)}
           disabled={saving}

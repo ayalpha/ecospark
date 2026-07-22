@@ -42,6 +42,7 @@ async function fetchImageAsBase64(url) {
 }
 
 async function callGeminiWithRetry(imagePart, prompt, maxRetries = 2) {
+  // Use gemini-2.5-flash for fast reasoning and generous free-tier rate limits
   const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
@@ -103,18 +104,47 @@ export default async function handler(req, res) {
       await submissionRef.set({ status: 'pending', updatedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
 
       const imagePart = await fetchImageAsBase64(imageUrl);
-      const verificationPrompt = `Does this photo clearly show a student performing or having completed this eco-friendly action: "${taskPrompt}"? 
-Look for visual evidence of the specific activity. Be strict — partial or ambiguous evidence should be rejected. The photo must clearly show the action or its direct result.`;
+      const verificationPrompt = `You are verifying a student's eco-action photo submission for a sustainability app.
+
+The student claims they completed this action: "${taskPrompt}"
+
+Please evaluate whether the photo shows reasonable evidence of this eco-friendly action being performed or completed.
+
+Be EXTREMELY LENIENT. Give the student the maximum benefit of the doubt.
+- Accept poor lighting, blur, weird angles, or partial framing.
+- Accept indirect evidence (e.g. holding a reusable bottle, standing near a bin, turning off a light switch).
+- Do not expect a perfect, staged photo. Real-world photos are messy.
+- Only reject if it is a completely unrelated image (like a screenshot, a meme, or a completely black photo).
+
+Respond with a confidence score where:
+- 0.7-1.0 = clearly shows the action or reasonable evidence
+- 0.4-0.69 = somewhat related, plausible but not definitive
+- 0.0-0.39 = unrelated or clearly not the claimed action`;
 
       const result = await callGeminiWithRetry(imagePart, verificationPrompt);
 
+      // Confidence-tiered decision
+      const confidence = result.confidence ?? 0.5;
+      let status;
+      if (confidence >= 0.7) {
+        // High confidence — auto-approve
+        status = 'approved';
+      } else if (confidence >= 0.4) {
+        // Medium confidence — auto-approve but mark for audit
+        status = 'approved';
+      } else {
+        // Low confidence — flag for manual review
+        status = 'flagged';
+      }
+
       await submissionRef.update({
-        status: result.approved ? 'approved' : 'rejected',
-        aiVerdict: result.approved,
-        confidence: result.confidence,
+        status,
+        aiVerdict: confidence >= 0.4,
+        confidence,
         reason: result.reason,
-        approvedAt: result.approved ? admin.firestore.FieldValue.serverTimestamp() : null,
-        rejectedAt: !result.approved ? admin.firestore.FieldValue.serverTimestamp() : null,
+        needsAudit: confidence >= 0.4 && confidence < 0.7,
+        approvedAt: status === 'approved' ? admin.firestore.FieldValue.serverTimestamp() : null,
+        flaggedAt: status === 'flagged' ? admin.firestore.FieldValue.serverTimestamp() : null,
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
 

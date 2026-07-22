@@ -2,26 +2,49 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuthStore } from '../store/authStore';
-import { getTasks, getUserSubmissions } from '../services/firestoreService';
+import { getTasks, getUserSubmissions, createTask } from '../services/firestoreService';
+import { generateTaskAI } from '../services/aiService';
 import TaskLogModal from '../components/tasks/TaskLogModal';
 import toast from 'react-hot-toast';
+import PremiumIcon from '../components/common/PremiumIcon';
+import { Zap, Droplets, Recycle, Utensils, Bike, Leaf, Users, CheckSquare, XCircle, Timer, Flag, Globe, Camera, AlertTriangle, Sparkles } from 'lucide-react';
 import styles from './Tasks.module.css';
 
+// Seeded random generator
+function mulberry32(a) {
+  return function() {
+    var t = a += 0x6D2B79F5;
+    t = Math.imul(t ^ t >>> 15, t | 1);
+    t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  }
+}
+
+function getDailySeed(userId) {
+  const date = new Date().toDateString(); // e.g. "Mon Jul 21 2026"
+  let str = date + (userId || '');
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = Math.imul(31, hash) + str.charCodeAt(i) | 0;
+  }
+  return hash;
+}
+
 const CATEGORY_ICONS = {
-  energy: '⚡',
-  water: '💧',
-  waste: '♻️',
-  food: '🥗',
-  transport: '🚲',
-  nature: '🌿',
-  community: '🤝',
+  energy: <PremiumIcon icon={Zap} color="gold" size={16} />,
+  water: <PremiumIcon icon={Droplets} color="sapphire" size={16} />,
+  waste: <PremiumIcon icon={Recycle} color="emerald" size={16} />,
+  food: <PremiumIcon icon={Utensils} color="ruby" size={16} />,
+  transport: <PremiumIcon icon={Bike} color="slate" size={16} />,
+  nature: <PremiumIcon icon={Leaf} color="emerald" size={16} />,
+  community: <PremiumIcon icon={Users} color="amethyst" size={16} />,
 };
 
 const STATUS_CONFIG = {
-  approved: { icon: '✅', label: 'Approved', color: 'var(--color-success)' },
-  rejected: { icon: '❌', label: 'Rejected', color: 'var(--color-error)' },
-  pending: { icon: '⏳', label: 'Verifying...', color: 'var(--color-warning)' },
-  flagged: { icon: '🚩', label: 'Flagged', color: 'var(--color-warning)' },
+  approved: { icon: <PremiumIcon icon={CheckSquare} color="emerald" size={16} />, label: 'Approved', color: 'var(--color-success)' },
+  rejected: { icon: <PremiumIcon icon={XCircle} color="ruby" size={16} />, label: 'Rejected', color: 'var(--color-error)' },
+  pending: { icon: <PremiumIcon icon={Timer} color="gold" size={16} />, label: 'Verifying...', color: 'var(--color-warning)' },
+  flagged: { icon: <PremiumIcon icon={Flag} color="ruby" size={16} />, label: 'Flagged', color: 'var(--color-warning)' },
 };
 
 function TaskCard({ task, submissions, onLog }) {
@@ -43,18 +66,23 @@ function TaskCard({ task, submissions, onLog }) {
     >
       <div className={styles.taskHeader}>
         <div className={styles.catBadge}>
-          <span>{CATEGORY_ICONS[task.category] || '🌱'}</span>
+          <span>{CATEGORY_ICONS[task.category] || <PremiumIcon icon={Leaf} color="emerald" size={16} />}</span>
           <span>{task.category}</span>
         </div>
-        <span className={styles.points}>+{task.points} pts</span>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          {task.expiresAt && !isCompleted && (
+            <Countdown expiresAt={task.expiresAt} />
+          )}
+          <span className={styles.points}>+{task.points} pts</span>
+        </div>
       </div>
 
       <h3 className={styles.taskTitle}>{task.title}</h3>
       <p className={styles.taskDesc}>{task.description}</p>
 
       <div className={styles.taskImpact}>
-        {task.co2 && <span>🌍 {task.co2}g CO₂ saved</span>}
-        {task.water && <span>💧 {task.water}L water saved</span>}
+        {task.co2 && <span><PremiumIcon icon={Globe} color="emerald" size={14} /> {task.co2}g CO₂ saved</span>}
+        {task.water && <span><PremiumIcon icon={Droplets} color="sapphire" size={14} /> {task.water}L water saved</span>}
       </div>
 
       <div className={styles.taskFooter}>
@@ -73,11 +101,32 @@ function TaskCard({ task, submissions, onLog }) {
             whileTap={{ scale: 0.95 }}
             disabled={status === 'pending'}
           >
-            {status === 'pending' ? '⏳ Verifying' : '📸 Log Task'}
+            {status === 'pending' ? <><PremiumIcon icon={Timer} size={16} /> Verifying</> : <><PremiumIcon icon={Camera} size={16} /> Log Task</>}
           </motion.button>
         )}
       </div>
     </motion.div>
+  );
+}
+
+function Countdown({ expiresAt }) {
+  const [left, setLeft] = useState(() => Math.max(0, expiresAt - Date.now()));
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setLeft(Math.max(0, expiresAt - Date.now()));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [expiresAt]);
+
+  if (left <= 0) return <span className={styles.expiredBadge}>Expired</span>;
+
+  const h = Math.floor(left / 3600000);
+  const m = Math.floor((left % 3600000) / 60000);
+  return (
+    <span className={styles.timeBadge}>
+      <PremiumIcon icon={Timer} color="gold" size={14} /> {h}h {m}m left
+    </span>
   );
 }
 
@@ -88,6 +137,7 @@ export default function Tasks() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [filter, setFilter] = useState('all');
+  const [sortOrder, setSortOrder] = useState(null); // null | 'asc' | 'desc'
   const [selectedTask, setSelectedTask] = useState(null);
 
   const loadData = () => {
@@ -101,7 +151,26 @@ export default function Tasks() {
       getTasks(),
       getUserSubmissions(profile.id, 50),
     ])
-      .then(([t, s]) => { setTasks(t); setSubmissions(s); })
+      .then(([t, s]) => { 
+        // 1. Shuffle tasks deterministically for the day
+        const rand = mulberry32(getDailySeed(profile.id));
+        const shuffled = [...t].sort(() => rand() - 0.5);
+        
+        // 2. Inject a daily bonus task
+        const bonusTask = {
+          id: `bonus-${getDailySeed(profile.id)}`,
+          title: 'Daily Bonus Challenge!',
+          description: 'A special high-value task available only for today.',
+          category: 'community',
+          points: 150,
+          co2: 50,
+          verificationPrompt: 'Show evidence of doing something exceptionally green today!',
+          expiresAt: new Date().setHours(23, 59, 59, 999), // End of today
+        };
+        
+        setTasks([bonusTask, ...shuffled]); 
+        setSubmissions(s); 
+      })
       .catch((err) => {
         console.error('[Tasks] Failed to load:', err);
         setError(err?.message || 'Unknown error loading tasks');
@@ -116,10 +185,27 @@ export default function Tasks() {
 
   const categories = ['all', ...new Set(tasks.map((t) => t.category))];
 
-  const filtered = filter === 'all' ? tasks
+  // Replenishment: Keep the board at 10 tasks max. Take first 10 uncompleted + any completed
+  // (so completed tasks stay visible in 'done' filter, but uncompleted ones replenish).
+  const uncompletedAll = tasks.filter(t => !submissions.some(s => s.taskId === t.id && s.status === 'approved'));
+  
+  // Only show active unexpired tasks
+  const activeUncompleted = uncompletedAll.filter(t => !t.expiresAt || t.expiresAt > Date.now());
+  const visibleUncompleted = activeUncompleted.slice(0, 10);
+  
+  const completed = tasks.filter(t => submissions.some(s => s.taskId === t.id && s.status === 'approved'));
+  const visibleTasks = [...visibleUncompleted, ...completed];
+
+  let filtered = filter === 'all' ? visibleTasks
     : filter === 'done'
-    ? tasks.filter((t) => submissions.some((s) => s.taskId === t.id && s.status === 'approved'))
-    : tasks.filter((t) => t.category === filter);
+    ? completed
+    : visibleTasks.filter((t) => t.category === filter);
+
+  if (sortOrder === 'asc') {
+    filtered.sort((a, b) => (a.points || 0) - (b.points || 0));
+  } else if (sortOrder === 'desc') {
+    filtered.sort((a, b) => (b.points || 0) - (a.points || 0));
+  }
 
   const doneCount = tasks.filter((t) =>
     submissions.some((s) => s.taskId === t.id && s.status === 'approved')
@@ -141,7 +227,7 @@ export default function Tasks() {
     return (
       <div className={styles.page}>
         <div className={styles.empty} style={{ padding: '48px 24px', gap: '16px' }}>
-          <span style={{ fontSize: '3rem' }}>⚠️</span>
+          <PremiumIcon icon={AlertTriangle} color="ruby" size={48} />
           <p style={{ fontWeight: 600, color: 'var(--color-text)', marginBottom: 0 }}>Failed to load tasks</p>
           <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', fontFamily: 'var(--font-mono)', background: 'var(--color-surface)', padding: '8px 12px', borderRadius: 8, maxWidth: '100%', wordBreak: 'break-all' }}>
             {error}
@@ -180,17 +266,30 @@ export default function Tasks() {
         </div>
       </div>
 
-      {/* Filter chips */}
-      <div className={styles.filters}>
-        {['all', 'done', ...new Set(tasks.map((t) => t.category))].map((cat) => (
-          <button
-            key={cat}
-            className={`${styles.chip} ${filter === cat ? styles.chipActive : ''}`}
-            onClick={() => setFilter(cat)}
-          >
-            {cat === 'all' ? '🌍 All' : cat === 'done' ? '✅ Done' : `${CATEGORY_ICONS[cat] || '🌱'} ${cat}`}
-          </button>
-        ))}
+      {/* Filter chips & Sort */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+        <div className={styles.filters}>
+          {['all', 'done', ...new Set(tasks.map((t) => t.category))].map((cat) => (
+            <button
+              key={cat}
+              className={`${styles.chip} ${filter === cat ? styles.chipActive : ''}`}
+              onClick={() => setFilter(cat)}
+            >
+              {cat === 'all' ? <><PremiumIcon icon={Globe} size={16} /> All</> : cat === 'done' ? <><PremiumIcon icon={CheckSquare} size={16} /> Done</> : <><span style={{display: 'inline-flex'}}>{CATEGORY_ICONS[cat] || <PremiumIcon icon={Leaf} size={16} />}</span> <span style={{marginLeft: '4px'}}>{cat}</span></>}
+            </button>
+          ))}
+        </div>
+        
+        {/* Sort toggle (off by default) */}
+        <select 
+          className={styles.sortSelect} 
+          value={sortOrder || ''} 
+          onChange={(e) => setSortOrder(e.target.value || null)}
+        >
+          <option value="">Sort: Default</option>
+          <option value="desc">Sort: Points (High to Low)</option>
+          <option value="asc">Sort: Points (Low to High)</option>
+        </select>
       </div>
 
       {/* Task grid */}
@@ -207,7 +306,7 @@ export default function Tasks() {
         </AnimatePresence>
         {filtered.length === 0 && (
           <div className={styles.empty}>
-            <span>🌱</span>
+            <PremiumIcon icon={Leaf} color="emerald" size={32} />
             <p>No tasks in this category yet.</p>
           </div>
         )}
@@ -221,7 +320,22 @@ export default function Tasks() {
             onClose={() => setSelectedTask(null)}
             onSuccess={(sub) => {
               setSubmissions((prev) => [sub, ...prev]);
+              
+              // Trigger autonomous AI task generation in the background
+              const taskContext = selectedTask.title;
               setSelectedTask(null);
+
+              toast.promise(
+                generateTaskAI(taskContext).then(async (newTaskData) => {
+                  const newId = await createTask(newTaskData);
+                  setTasks(prev => [...prev, { id: newId, ...newTaskData }]);
+                }),
+                {
+                  loading: '🌱 AI is generating a new task...',
+                  success: 'New task added to your board!',
+                  error: 'Failed to generate task.'
+                }
+              );
             }}
           />
         )}

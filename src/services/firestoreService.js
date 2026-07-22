@@ -15,22 +15,26 @@ export async function createUserProfile(uid, data) {
   await setDoc(doc(db, 'users', uid), {
     ...data,
     points: 0,
+    lifetimePoints: 0,
+    weeklyPoints: 0,
+    spendableBalance: 0,
     streak: 0,
     longestStreak: 0,
     lastActivityDate: null,
     badges: [],
+    unlockedFrames: [],
+    activeFrame: null,
     role: 'student',
     groupId: null,
     referralCode: `ECO-${uid.slice(0, 6).toUpperCase()}`,
     referredBy: null,
     referralCount: 0,
-    weeklyPoints: 0,
     totalTasksCompleted: 0,
     totalCO2Saved: 0,
     totalWaterSaved: 0,
     totalWasteSaved: 0,
     notificationsEnabled: true,
-    theme: 'forest',
+    theme: 'midnight',
     textSize: 'normal',
     reducedMotion: false,
     highContrast: false,
@@ -55,6 +59,21 @@ export async function updateUserProfile(uid, updates) {
     ...updates,
     updatedAt: serverTimestamp(),
   });
+  // Sync displayName and photoURL to leaderboard doc if changed
+  if (updates.displayName || updates.photoURL !== undefined) {
+    const lbUpdates = { updatedAt: serverTimestamp() };
+    if (updates.displayName) lbUpdates.displayName = updates.displayName;
+    if (updates.photoURL !== undefined) lbUpdates.photoURL = updates.photoURL;
+    try {
+      await updateDoc(doc(db, 'leaderboard', uid), lbUpdates);
+    } catch { /* leaderboard doc may not exist yet */ }
+  }
+}
+
+export function subscribeGlobalSettings(callback) {
+  return onSnapshot(doc(db, 'settings', 'global'), (snap) => {
+    callback(snap.exists() ? snap.data() : { maintenanceMode: false, allowSignups: true, pointsMultiplier: 1 });
+  });
 }
 
 // ─── TASKS ───────────────────────────────────────────────────────────────────
@@ -72,6 +91,16 @@ export function subscribeTasks(callback) {
     query(collection(db, 'tasks'), orderBy('category')),
     (snap) => callback(snap.docs.map((d) => ({ id: d.id, ...d.data() })))
   );
+}
+
+export async function createTask(taskData) {
+  const ref = doc(collection(db, 'tasks'));
+  await setDoc(ref, {
+    id: ref.id,
+    ...taskData,
+    createdAt: serverTimestamp(),
+  });
+  return ref.id;
 }
 
 // ─── SUBMISSIONS ──────────────────────────────────────────────────────────────
@@ -187,7 +216,9 @@ export async function awardPointsAndUpdateStreak(userId, taskId, points, impact 
 
     tx.update(userRef, {
       points: increment(points),
+      lifetimePoints: increment(points),
       weeklyPoints: increment(points),
+      spendableBalance: increment(points),
       streak: newStreak,
       longestStreak,
       lastActivityDate: serverTimestamp(),
@@ -198,17 +229,27 @@ export async function awardPointsAndUpdateStreak(userId, taskId, points, impact 
       updatedAt: serverTimestamp(),
     });
 
-    // Update global leaderboard entry
+    // Update global leaderboard entry with current profile data
     const lbRef = doc(db, 'leaderboard', userId);
     tx.set(lbRef, {
       userId,
       displayName: user.displayName,
       photoURL: user.photoURL || null,
       points: increment(points),
+      weeklyPoints: increment(points),
       streak: newStreak,
       groupId: user.groupId || null,
       updatedAt: serverTimestamp(),
     }, { merge: true });
+
+    const txRef = doc(collection(db, 'transactions'));
+    tx.set(txRef, {
+      userId,
+      type: 'earned',
+      amount: points,
+      description: 'Completed a task',
+      createdAt: serverTimestamp(),
+    });
   });
 }
 
@@ -232,14 +273,36 @@ export async function getLeaderboard(type = 'global', groupId = null, limitCount
   return snap.docs.map((d, i) => ({ rank: i + 1, id: d.id, ...d.data() }));
 }
 
-export function subscribeLeaderboard(type = 'global', groupId = null, callback, onError) {
-  let q = query(collection(db, 'leaderboard'), orderBy('points', 'desc'), limit(50));
-  if (type === 'group' && groupId) {
-    q = query(collection(db, 'leaderboard'), where('groupId', '==', groupId), orderBy('points', 'desc'), limit(50));
-  }
+export function subscribeLeaderboard(type = 'weekly', groupId = null, callback, onError) {
+  let sortField = type === 'streak' ? 'streak' : 'weeklyPoints';
+  let q = query(collection(db, 'leaderboard'), orderBy(sortField, 'desc'), limit(50));
   return onSnapshot(q, (snap) => {
     callback(snap.docs.map((d, i) => ({ rank: i + 1, id: d.id, ...d.data() })));
   }, onError);
+}
+
+// Get a single user's public profile data
+export async function getPublicProfile(userId) {
+  const snap = await getDoc(doc(db, 'users', userId));
+  if (!snap.exists()) return null;
+  const data = snap.data();
+  return {
+    id: snap.id,
+    displayName: data.displayName,
+    photoURL: data.photoURL,
+    lifetimePoints: data.lifetimePoints || data.points || 0,
+    spendableBalance: data.spendableBalance ?? data.points ?? 0,
+    weeklyPoints: data.weeklyPoints || 0,
+    streak: data.streak || 0,
+    longestStreak: data.longestStreak || 0,
+    totalTasksCompleted: data.totalTasksCompleted || 0,
+    totalCO2Saved: data.totalCO2Saved || 0,
+    totalWaterSaved: data.totalWaterSaved || 0,
+    badges: data.badges || [],
+    unlockedFrames: data.unlockedFrames || [],
+    activeFrame: data.activeFrame || null,
+    createdAt: data.createdAt,
+  };
 }
 
 // ─── REWARDS ──────────────────────────────────────────────────────────────────
@@ -255,11 +318,14 @@ export async function redeemReward(userId, rewardId, pointCost) {
     const userSnap = await tx.get(userRef);
     if (!userSnap.exists()) throw new Error('User not found');
     const user = userSnap.data();
-    if ((user.points || 0) < pointCost) throw new Error('Insufficient points');
+    const balance = user.spendableBalance ?? user.points ?? 0;
+    if (balance < pointCost) throw new Error('Insufficient points');
+
+    const isFrame = rewardId.startsWith('frame-');
 
     tx.update(userRef, {
-      points: increment(-pointCost),
-      badges: arrayUnion(rewardId),
+      spendableBalance: increment(-pointCost),
+      [isFrame ? 'unlockedFrames' : 'badges']: arrayUnion(rewardId),
       updatedAt: serverTimestamp(),
     });
 
@@ -270,6 +336,63 @@ export async function redeemReward(userId, rewardId, pointCost) {
       pointCost,
       redeemedAt: serverTimestamp(),
     });
+
+    const txRef = doc(collection(db, 'transactions'));
+    tx.set(txRef, {
+      userId,
+      type: 'spent',
+      amount: -pointCost,
+      description: `Redeemed ${rewardId.replace('frame-', '').replace(/-/g, ' ')}`,
+      createdAt: serverTimestamp(),
+    });
+  });
+}
+
+export async function equipFrame(userId, frameId) {
+  const userRef = doc(db, 'users', userId);
+  const lbRef = doc(db, 'leaderboard', userId);
+  
+  await updateDoc(userRef, {
+    activeFrame: frameId,
+    updatedAt: serverTimestamp(),
+  });
+  
+  try {
+    await updateDoc(lbRef, {
+      activeFrame: frameId,
+      updatedAt: serverTimestamp(),
+    });
+  } catch {
+    // Leaderboard doc might not exist yet, that's fine
+  }
+}
+
+export async function unequipFrame(userId) {
+  const userRef = doc(db, 'users', userId);
+  const lbRef = doc(db, 'leaderboard', userId);
+  
+  await updateDoc(userRef, {
+    activeFrame: null,
+    updatedAt: serverTimestamp(),
+  });
+  
+  try {
+    await updateDoc(lbRef, {
+      activeFrame: null,
+      updatedAt: serverTimestamp(),
+    });
+  } catch {
+    // Leaderboard doc might not exist yet
+  }
+}
+
+export async function requestAdminFrame(userId, frameId, displayName) {
+  await addDoc(collection(db, 'frameRequests'), {
+    userId,
+    displayName,
+    frameId,
+    status: 'pending',
+    createdAt: serverTimestamp(),
   });
 }
 
@@ -300,6 +423,60 @@ export async function createCommunityPost(userId, displayName, photoURL, content
     likes: [],
     commentCount: 0,
     createdAt: serverTimestamp(),
+  });
+}
+
+// ─── COMMENTS ─────────────────────────────────────────────────────────────────
+
+export async function addComment(postId, userId, displayName, photoURL, content) {
+  await addDoc(collection(db, 'community', postId, 'comments'), {
+    userId,
+    displayName,
+    photoURL: photoURL || null,
+    content,
+    createdAt: serverTimestamp(),
+  });
+  await updateDoc(doc(db, 'community', postId), {
+    commentCount: increment(1),
+  });
+}
+
+export function subscribeComments(postId, callback) {
+  return onSnapshot(
+    query(collection(db, 'community', postId, 'comments'), orderBy('createdAt', 'asc')),
+    (snap) => callback(snap.docs.map((d) => ({ id: d.id, ...d.data() }))),
+  );
+}
+
+// ─── REPORTS ──────────────────────────────────────────────────────────────────
+
+export async function reportPost(postId, reporterId, reason) {
+  await addDoc(collection(db, 'reports'), {
+    postId,
+    reporterId,
+    reason,
+    status: 'pending',
+    createdAt: serverTimestamp(),
+  });
+}
+
+export async function getPendingReports() {
+  const snap = await getDocs(
+    query(collection(db, 'reports'), where('status', '==', 'pending'))
+  );
+  let results = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  results.sort((a, b) => {
+    const timeA = a.createdAt?.toMillis ? a.createdAt.toMillis() : 0;
+    const timeB = b.createdAt?.toMillis ? b.createdAt.toMillis() : 0;
+    return timeB - timeA;
+  });
+  return results;
+}
+
+export async function resolveReport(reportId, action) {
+  await updateDoc(doc(db, 'reports', reportId), {
+    status: action, // 'resolved' | 'dismissed'
+    resolvedAt: serverTimestamp(),
   });
 }
 
@@ -380,7 +557,18 @@ export async function processReferral(newUserId, referralCode) {
   await updateDoc(doc(db, 'users', newUserId), { referredBy: referrer.id });
   await updateDoc(doc(db, 'users', referrer.id), {
     referralCount: increment(1),
-    points: increment(50), // bonus points when referree completes first task (called from server)
+    points: increment(50), 
+    lifetimePoints: increment(50),
+    weeklyPoints: increment(50),
+    spendableBalance: increment(50),
+  });
+
+  await addDoc(collection(db, 'transactions'), {
+    userId: referrer.id,
+    type: 'earned',
+    amount: 50,
+    description: 'Referral bonus',
+    createdAt: serverTimestamp(),
   });
 }
 
@@ -411,4 +599,97 @@ export async function getWeeklyImpact(userId) {
     waterSaved: approved.reduce((s, a) => s + (a.water || 0), 0),
     wasteSaved: approved.reduce((s, a) => s + (a.waste || 0), 0),
   };
+}
+
+// ─── DIRECT MESSAGING ───────────────────────────────────────────────────────
+
+export async function createOrGetChat(userAId, userBId) {
+  // Try to find existing chat
+  const q = query(
+    collection(db, 'chats'),
+    where('participants', 'array-contains', userAId)
+  );
+  const snap = await getDocs(q);
+  const existingChat = snap.docs.find(doc => doc.data().participants.includes(userBId));
+  
+  if (existingChat) {
+    return existingChat.id;
+  }
+  
+  // Create new chat
+  const ref = doc(collection(db, 'chats'));
+  await setDoc(ref, {
+    participants: [userAId, userBId],
+    lastMessage: null,
+    updatedAt: serverTimestamp(),
+  });
+  return ref.id;
+}
+
+export function subscribeConversations(userId, callback) {
+  const q = query(
+    collection(db, 'chats'),
+    where('participants', 'array-contains', userId)
+  );
+  return onSnapshot(q, (snap) => {
+    let results = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    // Sort in memory to avoid requiring a composite index in Firestore
+    results.sort((a, b) => {
+      const timeA = a.updatedAt?.toMillis ? a.updatedAt.toMillis() : 0;
+      const timeB = b.updatedAt?.toMillis ? b.updatedAt.toMillis() : 0;
+      return timeB - timeA;
+    });
+    callback(results);
+  });
+}
+
+export function subscribeMessages(chatId, callback) {
+  const q = query(
+    collection(db, 'chats', chatId, 'messages'),
+    orderBy('createdAt', 'asc')
+  );
+  return onSnapshot(q, (snap) => {
+    callback(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+  });
+}
+
+export async function sendMessage(chatId, senderId, text, mediaUrl = null, mediaType = null) {
+  const msgRef = doc(collection(db, 'chats', chatId, 'messages'));
+  const payload = {
+    senderId,
+    text,
+    createdAt: serverTimestamp(),
+  };
+  if (mediaUrl) {
+    payload.mediaUrl = mediaUrl;
+    payload.mediaType = mediaType;
+  }
+  
+  await setDoc(msgRef, payload);
+  
+  await updateDoc(doc(db, 'chats', chatId), {
+    lastMessage: text || (mediaType === 'video' ? 'Sent a video' : 'Sent an image'),
+    updatedAt: serverTimestamp(),
+  });
+}
+
+// ─── TRANSACTIONS ─────────────────────────────────────────────────────────────
+
+export function subscribeUserTransactions(userId, callback) {
+  const q = query(
+    collection(db, 'transactions'),
+    where('userId', '==', userId)
+  );
+  return onSnapshot(q, (snap) => {
+    const results = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    results.sort((a, b) => {
+      const timeA = a.createdAt?.toMillis ? a.createdAt.toMillis() : 0;
+      const timeB = b.createdAt?.toMillis ? b.createdAt.toMillis() : 0;
+      return timeB - timeA;
+    });
+    callback(results.slice(0, 50));
+  }, (err) => {
+    console.error("Error loading transactions:", err);
+    callback([]);
+  });
 }

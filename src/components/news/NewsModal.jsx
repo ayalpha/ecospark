@@ -14,9 +14,9 @@ export default function NewsModal({ article, onClose }) {
       />
       <motion.div
         className={styles.modal}
-        initial={{ opacity: 0, scale: 0.95, y: 20 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.95, y: 20 }}
+        initial={{ opacity: 0, scale: 0.95, x: "-50%", y: "-45%" }}
+        animate={{ opacity: 1, scale: 1, x: "-50%", y: "-50%" }}
+        exit={{ opacity: 0, scale: 0.95, x: "-50%", y: "-45%" }}
         transition={{ type: 'spring', stiffness: 400, damping: 35 }}
         role="dialog"
         aria-label={article.title}

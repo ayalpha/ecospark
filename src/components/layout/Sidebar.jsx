@@ -4,15 +4,19 @@ import { motion } from 'framer-motion';
 import { signOut } from 'firebase/auth';
 import { auth } from '../../lib/firebase';
 import { useAuthStore } from '../../store/authStore';
+import { Home, CheckSquare, Trophy, Gift, Globe, MessageCircle, Info, ShieldAlert, Zap, LogOut } from 'lucide-react';
+import PremiumIcon from '../common/PremiumIcon';
+import Avatar from '../common/Avatar';
 import styles from './Sidebar.module.css';
 
 const NAV_ITEMS = [
-  { path: '/', icon: '🏠', label: 'Home' },
-  { path: '/tasks', icon: '✅', label: 'Tasks' },
-  { path: '/leaderboard', icon: '🏆', label: 'Leaderboard' },
-  { path: '/rewards', icon: '🎁', label: 'Rewards' },
-  { path: '/community', icon: '🌍', label: 'Community' },
-  { path: '/about', icon: 'ℹ️', label: 'About' },
+  { path: '/', icon: <PremiumIcon icon={Home} color="emerald" size={20} />, label: 'Home' },
+  { path: '/tasks', icon: <PremiumIcon icon={CheckSquare} color="sapphire" size={20} />, label: 'Tasks' },
+  { path: '/leaderboard', icon: <PremiumIcon icon={Trophy} color="gold" size={20} />, label: 'Leaderboard' },
+  { path: '/rewards', icon: <PremiumIcon icon={Gift} color="ruby" size={20} />, label: 'Rewards' },
+  { path: '/community', icon: <PremiumIcon icon={Globe} color="emerald" size={20} />, label: 'Community' },
+  { path: '/messages', icon: <PremiumIcon icon={MessageCircle} color="amethyst" size={20} />, label: 'Messages' },
+  { path: '/about', icon: <PremiumIcon icon={Info} color="slate" size={20} />, label: 'About' },
 ];
 
 export default function Sidebar() {
@@ -34,61 +38,62 @@ export default function Sidebar() {
 
       {/* Nav Links */}
       <nav className={styles.nav}>
-        {NAV_ITEMS.map((item) => (
-          <NavLink
-            key={item.path}
-            to={item.path}
-            end={item.path === '/'}
-            className={({ isActive }) =>
-              `${styles.navItem} ${isActive ? styles.active : ''}`
-            }
-          >
-            {({ isActive }) => (
-              <>
-                <span className={styles.navIcon}>{item.icon}</span>
-                <span className={styles.navLabel}>{item.label}</span>
-                {isActive && (
-                  <motion.div
-                    layoutId="activeNavIndicator"
-                    className={styles.activeIndicator}
-                    transition={{ type: 'spring', stiffness: 500, damping: 40 }}
-                  />
-                )}
-              </>
-            )}
-          </NavLink>
-        ))}
+        <div className={styles.navInner}>
+          {NAV_ITEMS.map((item) => (
+            <NavLink
+              key={item.path}
+              to={item.path}
+              end={item.path === '/'}
+              className={({ isActive }) =>
+                `${styles.navItem} ${isActive ? styles.active : ''}`
+              }
+            >
+              {({ isActive }) => (
+                <>
+                  <span className={styles.navIcon}>{item.icon}</span>
+                  <span className={styles.navLabel}>{item.label}</span>
+                  {isActive && (
+                    <motion.div
+                      layoutId="activeNavIndicator"
+                      className={styles.activeIndicator}
+                      transition={{ type: 'spring', stiffness: 500, damping: 40 }}
+                    />
+                  )}
+                </>
+              )}
+            </NavLink>
+          ))}
 
-        {profile?.role === 'teacher' && (
-          <NavLink
-            to="/admin"
-            className={({ isActive }) =>
-              `${styles.navItem} ${isActive ? styles.active : ''}`
-            }
-          >
-            <span className={styles.navIcon}>👨‍🏫</span>
-            <span className={styles.navLabel}>Admin</span>
-          </NavLink>
-        )}
+          {(profile?.role === 'teacher' || profile?.role === 'admin') && (
+            <NavLink
+              to="/admin"
+              className={({ isActive }) =>
+                `${styles.navItem} ${isActive ? styles.active : ''}`
+              }
+            >
+              <span className={styles.navIcon}><PremiumIcon icon={ShieldAlert} color="ruby" size={20} /></span>
+              <span className={styles.navLabel}>Admin</span>
+            </NavLink>
+          )}
+        </div>
       </nav>
 
       {/* User mini card */}
       <div className={styles.userCard}>
         <NavLink to="/profile" className={styles.userLink}>
           <div className={styles.userAvatar}>
-            {profile?.photoURL ? (
-              <img src={profile.photoURL} alt={profile.displayName} />
-            ) : (
-              <span>{(profile?.displayName || user?.email || '?')[0].toUpperCase()}</span>
-            )}
+            <Avatar src={profile?.photoURL} activeFrame={profile?.activeFrame} size={40} alt={profile?.displayName} />
           </div>
           <div className={styles.userInfo}>
             <p className={styles.userName}>{profile?.displayName || 'EcoUser'}</p>
-            <p className={styles.userPoints}>⚡ {profile?.points || 0} pts</p>
+            <p className={styles.userPoints}>
+              <PremiumIcon icon={Zap} color="gold" size={14} className="mr-1" />
+              {profile?.spendableBalance ?? profile?.points ?? 0} pts
+            </p>
           </div>
         </NavLink>
         <button onClick={handleLogout} className={styles.logoutBtn} title="Sign out">
-          ↩
+          <PremiumIcon icon={LogOut} color="slate" size={18} />
         </button>
       </div>
     </aside>

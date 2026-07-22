@@ -6,6 +6,8 @@ import { useAuthStore } from '../store/authStore';
 import { useUiStore } from '../store/uiStore';
 import NewsBoard from '../components/news/NewsBoard';
 import EcoHeroStatic from '../components/hero/EcoHeroStatic';
+import PremiumIcon from '../components/common/PremiumIcon';
+import { Camera, Trophy, Gift, Globe, Settings, Zap, Flame, CheckSquare, Leaf, Sparkles } from 'lucide-react';
 import styles from './Home.module.css';
 
 // Lazy-load 3D hero (code-split, never blocks initial paint)
@@ -39,7 +41,10 @@ function HeroSection() {
   );
 }
 
-function StatCard({ icon, label, value, sublabel, color, to }) {
+function StatCard({ icon, label, value, sublabel, color, to, current, goal }) {
+  const hasProgress = typeof current === 'number' && typeof goal === 'number';
+  const progress = hasProgress ? Math.min(1, Math.max(0, current / goal)) : 0;
+  
   const content = (
     <motion.div
       className={styles.statCard}
@@ -47,7 +52,28 @@ function StatCard({ icon, label, value, sublabel, color, to }) {
       transition={{ duration: 0.2 }}
       style={{ '--card-accent': color }}
     >
-      <div className={styles.statIcon}>{icon}</div>
+      <div className={styles.statHeader}>
+        <div className={styles.statIconWrap}>
+          {hasProgress && (
+            <svg className={styles.progressRing} width="48" height="48">
+              <circle stroke="var(--color-border)" strokeWidth="4" fill="transparent" r="20" cx="24" cy="24" />
+              <circle 
+                stroke={color} 
+                strokeWidth="4" 
+                fill="transparent" 
+                r="20" 
+                cx="24" 
+                cy="24" 
+                strokeDasharray={`${20 * 2 * Math.PI}`}
+                strokeDashoffset={`${20 * 2 * Math.PI * (1 - progress)}`}
+                strokeLinecap="round"
+                style={{ transition: 'stroke-dashoffset 1s ease-out', transform: 'rotate(-90deg)', transformOrigin: '50% 50%' }}
+              />
+            </svg>
+          )}
+          <div className={styles.statIcon}>{icon}</div>
+        </div>
+      </div>
       <div className={styles.statBody}>
         <motion.p
           className={styles.statValue}
@@ -69,10 +95,10 @@ function StatCard({ icon, label, value, sublabel, color, to }) {
 
 function QuickActions() {
   const actions = [
-    { icon: '📸', label: 'Log Task', to: '/tasks', color: 'var(--color-primary)' },
-    { icon: '🏆', label: 'Leaderboard', to: '/leaderboard', color: 'var(--color-gold)' },
-    { icon: '🎁', label: 'Rewards', to: '/rewards', color: 'var(--color-secondary)' },
-    { icon: '🌍', label: 'Community', to: '/community', color: '#7C3AED' },
+    { icon: <PremiumIcon icon={Camera} color="emerald" size={24} />, label: 'Log Task', to: '/tasks', color: 'var(--color-primary)' },
+    { icon: <PremiumIcon icon={Trophy} color="gold" size={24} />, label: 'Leaderboard', to: '/leaderboard', color: 'var(--color-gold)' },
+    { icon: <PremiumIcon icon={Gift} color="ruby" size={24} />, label: 'Rewards', to: '/rewards', color: 'var(--color-secondary)' },
+    { icon: <PremiumIcon icon={Globe} color="sapphire" size={24} />, label: 'Community', to: '/community', color: '#7C3AED' },
   ];
 
   return (
@@ -107,10 +133,10 @@ export default function Home() {
   const streakMsg = useMemo(() => {
     const s = profile?.streak || 0;
     if (s === 0) return 'Start your streak today!';
-    if (s === 1) return "You've started! Keep going 🌱";
+    if (s === 1) return <span className="flex items-center gap-1">You've started! Keep going <PremiumIcon icon={Leaf} size={16} /></span>;
     if (s < 7) return `${s} days strong!`;
-    if (s < 30) return `${s} days — you're on fire! 🔥`;
-    return `${s} days — legend! 🏆`;
+    if (s < 30) return <span className="flex items-center gap-1">{s} days — you're on fire! <PremiumIcon icon={Flame} color="ruby" size={16} /></span>;
+    return <span className="flex items-center gap-1">{s} days — legend! <PremiumIcon icon={Trophy} color="gold" size={16} /></span>;
   }, [profile?.streak]);
 
   return (
@@ -124,11 +150,11 @@ export default function Home() {
       >
         <div>
           <h1 className={styles.greeting}>
-            {greeting}, <span className={styles.name}>{profile?.displayName?.split(' ')[0] || 'EcoHero'}</span> 👋
+            {greeting}, <span className={styles.name}>{profile?.displayName?.split(' ')[0] || 'EcoHero'}</span> <PremiumIcon icon={Sparkles} color="gold" size={24} />
           </h1>
-          <p className={styles.subgreeting}>{streakMsg}</p>
+          <div className={styles.subgreeting}>{streakMsg}</div>
         </div>
-        <Link to="/settings" className={styles.settingsBtn} aria-label="Settings">⚙️</Link>
+        <Link to="/settings" className={styles.settingsBtn} aria-label="Settings"><PremiumIcon icon={Settings} color="slate" size={24} /></Link>
       </motion.div>
 
       {/* ══════════════════════════════════════════
@@ -138,67 +164,75 @@ export default function Home() {
           Desktop: 3-col with hero spanning 2 rows
       ══════════════════════════════════════════ */}
       <div className={styles.grid}>
+        
+        <div className={styles.leftCol}>
+          {/* 3D Hero (desktop only, spans 2 rows) */}
+          <motion.div
+            className={styles.heroCard}
+            initial={{ opacity: 0, scale: 0.97 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: 0.15, duration: 0.5 }}
+          >
+            <HeroSection />
+            <div className={styles.heroOverlay}>
+              <p className={styles.heroLabel}>Your Eco Impact</p>
+              <p className={styles.heroPoints} style={{display:'flex', alignItems:'center', gap:'0.5rem', justifyContent:'flex-start'}}>
+                <PremiumIcon icon={Zap} color="gold" size={20} /> <strong>{(profile?.lifetimePoints || profile?.points || 0).toLocaleString()}</strong> points earned
+              </p>
+            </div>
+          </motion.div>
 
-        {/* 3D Hero (desktop only, spans 2 rows) */}
-        <motion.div
-          className={styles.heroCard}
-          initial={{ opacity: 0, scale: 0.97 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ delay: 0.15, duration: 0.5 }}
-        >
-          <HeroSection />
-          <div className={styles.heroOverlay}>
-            <p className={styles.heroLabel}>Your Eco Impact</p>
-            <p className={styles.heroPoints}>
-              ⚡ <strong>{(profile?.points || 0).toLocaleString()}</strong> points earned
-            </p>
+          {/* Quick actions */}
+          <div className={styles.actionsArea}>
+            <h2 className={styles.sectionHeading}>Quick Actions</h2>
+            <QuickActions />
           </div>
-        </motion.div>
-
-        {/* Stats row */}
-        <div className={styles.statsArea}>
-          <StatCard
-            icon="🔥"
-            label="Day Streak"
-            value={profile?.streak || 0}
-            sublabel={profile?.longestStreak ? `Longest: ${profile.longestStreak} days` : 'Start your streak today!'}
-            color="var(--color-streak)"
-            to="/tasks"
-          />
-          <StatCard
-            icon="⚡"
-            label="Total Points"
-            value={(profile?.points || 0).toLocaleString()}
-            sublabel={`This week: ${profile?.weeklyPoints || 0}`}
-            color="var(--color-gold)"
-            to="/leaderboard"
-          />
-          <StatCard
-            icon="✅"
-            label="Tasks Done"
-            value={profile?.totalTasksCompleted || 0}
-            sublabel="eco actions logged"
-            color="var(--color-primary)"
-            to="/tasks"
-          />
-          <StatCard
-            icon="🌿"
-            label="CO₂ Saved"
-            value={`${((profile?.totalCO2Saved || 0) / 1000).toFixed(1)}kg`}
-            sublabel="estimated impact"
-            color="var(--color-secondary)"
-          />
         </div>
 
-        {/* Quick actions */}
-        <div className={styles.actionsArea}>
-          <h2 className={styles.sectionHeading}>Quick Actions</h2>
-          <QuickActions />
-        </div>
+        <div className={styles.rightCol}>
+          {/* Stats row */}
+          <div className={styles.statsArea}>
+            <StatCard
+              icon={<PremiumIcon icon={Flame} color="ruby" size={24} />}
+              label="Day Streak"
+              value={profile?.streak || 0}
+              sublabel={profile?.longestStreak ? `Longest: ${profile.longestStreak} days` : 'Start your streak today!'}
+              color="var(--color-streak)"
+              to="/tasks"
+            />
+            <StatCard
+              icon={<PremiumIcon icon={Zap} color="gold" size={24} />}
+              label="Available Points"
+              value={(profile?.spendableBalance ?? profile?.points ?? 0).toLocaleString()}
+              sublabel={`This week: ${profile?.weeklyPoints || 0}`}
+              color="var(--color-gold)"
+              to="/leaderboard"
+            />
+            <StatCard
+              icon={<PremiumIcon icon={CheckSquare} color="emerald" size={24} />}
+              label="Tasks Done"
+              value={profile?.totalTasksCompleted || 0}
+              sublabel="Weekly Goal: 5 Tasks"
+              color="var(--color-primary)"
+              to="/tasks"
+              current={profile?.totalTasksCompleted || 0}
+              goal={5}
+            />
+            <StatCard
+              icon={<PremiumIcon icon={Leaf} color="emerald" size={24} />}
+              label="CO₂ Saved"
+              value={`${((profile?.totalCO2Saved || 0) / 1000).toFixed(1)}kg`}
+              sublabel="Weekly Goal: 10kg"
+              color="var(--color-secondary)"
+              current={(profile?.totalCO2Saved || 0) / 1000}
+              goal={10}
+            />
+          </div>
 
-        {/* News board */}
-        <div className={styles.newsArea}>
-          <NewsBoard />
+          {/* News board */}
+          <div className={styles.newsArea}>
+            <NewsBoard />
+          </div>
         </div>
       </div>
     </div>

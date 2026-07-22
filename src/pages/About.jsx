@@ -1,10 +1,12 @@
 // src/pages/About.jsx — For judges: explains verification pipeline and NEP 2020 alignment
 import { motion } from 'framer-motion';
 import styles from './About.module.css';
+import PremiumIcon from '../components/common/PremiumIcon';
+import { Search, Bot, BookOpen, Wrench, Leaf, Heart } from 'lucide-react';
 
 const SECTIONS = [
   {
-    icon: '🔍',
+    icon: <PremiumIcon icon={Search} color="sapphire" size={24} />,
     title: 'How Photo Verification Works',
     content: `When a student submits a photo for a task:
 1. The photo is uploaded to Firebase Storage.
@@ -16,7 +18,7 @@ const SECTIONS = [
 7. Every AI decision is logged (verdict, confidence, reasoning) for auditability.`,
   },
   {
-    icon: '🤖',
+    icon: <PremiumIcon icon={Bot} color="emerald" size={24} />,
     title: 'AI Coach Architecture',
     content: `The AI coach uses Groq's API (llama-3.3-70b-versatile model) with streaming enabled.
 Responses begin appearing in under 2 seconds — tokens stream one-by-one into the chat UI via Server-Sent Events.
@@ -24,7 +26,7 @@ The coach uses a system prompt tailored to sustainability education, capped at 4
 All API keys are server-side in Vercel environment variables — never exposed to the client.`,
   },
   {
-    icon: '📚',
+    icon: <PremiumIcon icon={BookOpen} color="gold" size={24} />,
     title: 'NEP 2020 Alignment',
     content: `EcoSpark directly supports National Education Policy 2020 objectives:
 • Experiential Learning: Students perform real-world eco-actions and photograph evidence, not just answer MCQs.
@@ -34,7 +36,7 @@ All API keys are server-side in Vercel environment variables — never exposed t
 • Competency-Based Progress: Points, streaks, and badges create measurable milestones tied to genuine behavior change.`,
   },
   {
-    icon: '🏗️',
+    icon: <PremiumIcon icon={Wrench} color="slate" size={24} />,
     title: 'Technical Architecture',
     content: `Frontend: React + Vite (code-split, lazy-loaded routes) + Framer Motion + react-three-fiber (3D hero).
 Backend: Firebase (Auth, Firestore, Storage) + Vercel serverless functions.
@@ -53,7 +55,7 @@ export default function About() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4 }}
       >
-        <div className={styles.heroIcon}>🌱</div>
+        <div className={styles.heroIcon}><PremiumIcon icon={Leaf} color="emerald" size={64} /></div>
         <h1 className={styles.heroTitle}>About EcoSpark</h1>
         <p className={styles.heroSub}>
           A gamified sustainability habit tracker for students, powered by AI and built entirely on free-tier infrastructure.
@@ -86,7 +88,7 @@ export default function About() {
       </div>
 
       <div className={styles.footer}>
-        <p>Built with ❤️ for sustainability education</p>
+        <p style={{display:'flex', alignItems:'center', gap:'0.25rem', justifyContent:'center'}}>Built with <PremiumIcon icon={Heart} color="ruby" size={16} /> for sustainability education</p>
         <p className={styles.footerSub}>Zero paid APIs · 100% free-tier infrastructure</p>
       </div>
     </div>

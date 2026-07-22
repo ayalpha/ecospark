@@ -7,14 +7,16 @@ import { useAuthStore } from '../../store/authStore';
 import { createSubmission, subscribeSubmission, awardPointsAndUpdateStreak } from '../../services/firestoreService';
 import { verifyTaskPhoto } from '../../services/aiService';
 import toast from 'react-hot-toast';
+import PremiumIcon from '../common/PremiumIcon';
+import { Timer, Search, CheckSquare, XCircle, Flag, Camera, Sparkles, Leaf } from 'lucide-react';
 import styles from './TaskLogModal.module.css';
 
 const VERIFICATION_STAGES = {
-  pending: { icon: '⏳', msg: 'Submitted — verifying your photo...', pct: 30 },
-  checking: { icon: '🔍', msg: 'Still checking — AI is analysing the image...', pct: 60 },
-  approved: { icon: '✅', msg: 'Verified! Great eco-action!', pct: 100 },
-  rejected: { icon: '❌', msg: 'Not verified — the photo didn\'t clearly show the task.', pct: 100 },
-  flagged: { icon: '🚩', msg: 'Flagged for manual review — a teacher will check it.', pct: 100 },
+  pending: { icon: <PremiumIcon icon={Timer} color="gold" size={24} />, msg: 'Submitted — verifying your photo...', pct: 30 },
+  checking: { icon: <PremiumIcon icon={Search} color="sapphire" size={24} />, msg: 'Still checking — AI is analysing the image...', pct: 60 },
+  approved: { icon: <PremiumIcon icon={CheckSquare} color="emerald" size={24} />, msg: 'Verified! Great eco-action!', pct: 100 },
+  rejected: { icon: <PremiumIcon icon={XCircle} color="ruby" size={24} />, msg: 'Not verified — the photo didn\'t clearly show the task.', pct: 100 },
+  flagged: { icon: <PremiumIcon icon={Flag} color="ruby" size={24} />, msg: 'Flagged for manual review — a teacher will check it.', pct: 100 },
 };
 
 export default function TaskLogModal({ task, onClose, onSuccess }) {
@@ -120,7 +122,7 @@ export default function TaskLogModal({ task, onClose, onSuccess }) {
               water: task.water || 0,
               waste: task.waste || 0,
             });
-            toast.success(`+${task.points || 50} points earned! 🌱`);
+            toast.success(<span>+{task.points || 50} points earned! <PremiumIcon icon={Leaf} color="emerald" size={16} /></span>);
           }
 
           onSuccess?.(data);
@@ -147,9 +149,9 @@ export default function TaskLogModal({ task, onClose, onSuccess }) {
       />
       <motion.div
         className={styles.modal}
-        initial={{ opacity: 0, scale: 0.95, y: 20 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.95, y: 20 }}
+        initial={{ opacity: 0, scale: 0.95, x: "-50%", y: "-45%" }}
+        animate={{ opacity: 1, scale: 1, x: "-50%", y: "-50%" }}
+        exit={{ opacity: 0, scale: 0.95, x: "-50%", y: "-45%" }}
         transition={{ type: 'spring', stiffness: 380, damping: 32 }}
         role="dialog"
       >
@@ -166,8 +168,8 @@ export default function TaskLogModal({ task, onClose, onSuccess }) {
         <div className={styles.body}>
           {!stage ? (
             <>
-              <p className={styles.instruction}>
-                📸 Take or upload a photo that clearly shows you completing this task:
+              <p className={styles.instruction} style={{display:'flex', alignItems:'center', gap:'0.5rem'}}>
+                <PremiumIcon icon={Camera} color="sapphire" size={20} /> Take or upload a photo that clearly shows you completing this task:
               </p>
               <div className={styles.taskPrompt}>
                 <strong>What to show:</strong> {task.verificationPrompt || task.description}
@@ -191,7 +193,7 @@ export default function TaskLogModal({ task, onClose, onSuccess }) {
                   tabIndex={0}
                   role="button"
                 >
-                  <span className={styles.uploadIcon}>📷</span>
+                  <span className={styles.uploadIcon}><PremiumIcon icon={Camera} color="slate" size={48} /></span>
                   <p>Tap to take a photo or choose from gallery</p>
                   <span className={styles.uploadHint}>Max 10MB · JPG, PNG, WEBP</span>
                 </div>
@@ -263,13 +265,14 @@ export default function TaskLogModal({ task, onClose, onSuccess }) {
               className={styles.submitBtn}
               onClick={handleSubmit}
               disabled={!photo || uploading}
+              style={{display:'flex', alignItems:'center', gap:'0.5rem', justifyContent:'center'}}
             >
-              {uploading ? 'Uploading...' : 'Submit for Verification 🔍'}
+              {uploading ? 'Uploading...' : <>Submit for Verification <PremiumIcon icon={Search} size={16} /></>}
             </button>
           ) : isDone ? (
             <div className={styles.doneActions}>
-              <button className={styles.doneBtn} onClick={onClose}>
-                {stage === 'approved' ? '🎉 Awesome!' : 'OK, got it'}
+              <button className={styles.doneBtn} onClick={onClose} style={{display:'flex', alignItems:'center', gap:'0.5rem', justifyContent:'center'}}>
+                {stage === 'approved' ? <><PremiumIcon icon={Sparkles} color="white" size={16} /> Awesome!</> : 'OK, got it'}
               </button>
               {stage !== 'approved' && (
                 <button

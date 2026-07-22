@@ -3,8 +3,8 @@ import { create } from 'zustand';
 
 const getPreferredTheme = () => {
   try {
-    return localStorage.getItem('ecospark-theme') || 'forest';
-  } catch { return 'forest'; }
+    return localStorage.getItem('ecospark-theme') || 'metallic';
+  } catch { return 'metallic'; }
 };
 
 const getPreferredMotion = () => {
@@ -65,7 +65,7 @@ export const useUiStore = create((set, get) => ({
   setTheme: (theme) => {
     localStorage.setItem('ecospark-theme', theme);
     // Map theme name to data-theme attribute value
-    const attrMap = { forest: '', ocean: 'ocean', dark: 'dark', midnight: 'midnight', sunset: 'sunset' };
+    const attrMap = { forest: '', ocean: 'ocean', dark: 'dark', midnight: 'midnight', sunset: 'sunset', metallic: 'metallic' };
     document.documentElement.setAttribute('data-theme', attrMap[theme] ?? theme);
     set({ activeTheme: theme });
   },

@@ -10,30 +10,19 @@
 
 .modal {
   position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  max-height: 85dvh; /* use dynamic viewport height so mobile UI doesn't cover bottom */
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(94vw, 520px);
+  height: auto;
+  max-height: 85vh; /* use safe vh instead of dvh */
   background: var(--color-bg-card);
-  border-radius: var(--card-radius-lg) var(--card-radius-lg) 0 0;
+  border-radius: var(--card-radius-lg);
   box-shadow: var(--elevation-4);
   z-index: 3001;
   overflow: hidden;
   display: flex;
   flex-direction: column;
-}
-
-@media (min-width: 640px) {
-  .modal {
-    top: 50%;
-    bottom: auto;
-    left: 50%;
-    right: auto;
-    transform: translate(-50%, -50%);
-    width: min(94vw, 520px);
-    max-height: 85dvh;
-    border-radius: var(--card-radius-lg);
-  }
 }
 
 .header {
@@ -84,8 +73,8 @@
   display: flex;
   flex-direction: column;
   gap: 16px;
-  flex: 1 1 0;
-  min-height: 0;
+  flex: 1 1 auto;
+  min-height: 120px;
 }
 
 .footer {
@@ -118,7 +107,7 @@
 .uploadZone {
   border: 2px dashed var(--color-border-strong);
   border-radius: var(--card-radius);
-  padding: 36px 20px;
+  padding: 24px 20px;
   display: flex;
   flex-direction: column;
   align-items: center;

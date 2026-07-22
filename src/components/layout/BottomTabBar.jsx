@@ -3,12 +3,15 @@ import { NavLink } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import styles from './BottomTabBar.module.css';
 
+import { Home, CheckSquare, Trophy, Gift, User } from 'lucide-react';
+import PremiumIcon from '../common/PremiumIcon';
+
 const TABS = [
-  { path: '/', icon: '🏠', label: 'Home' },
-  { path: '/tasks', icon: '✅', label: 'Tasks' },
-  { path: '/leaderboard', icon: '🏆', label: 'Rank' },
-  { path: '/rewards', icon: '🎁', label: 'Rewards' },
-  { path: '/profile', icon: '👤', label: 'Profile' },
+  { path: '/', icon: <PremiumIcon icon={Home} color="emerald" size={24} />, label: 'Home' },
+  { path: '/tasks', icon: <PremiumIcon icon={CheckSquare} color="sapphire" size={24} />, label: 'Tasks' },
+  { path: '/leaderboard', icon: <PremiumIcon icon={Trophy} color="gold" size={24} />, label: 'Rank' },
+  { path: '/rewards', icon: <PremiumIcon icon={Gift} color="ruby" size={24} />, label: 'Rewards' },
+  { path: '/profile', icon: <PremiumIcon icon={User} color="amethyst" size={24} />, label: 'Profile' },
 ];
 
 export default function BottomTabBar() {

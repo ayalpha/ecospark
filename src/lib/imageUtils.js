@@ -14,7 +14,7 @@ export async function compressImageToBase64(file) {
       const img = new Image();
       img.onload = () => {
         const canvas = document.createElement('canvas');
-        const MAX_SIZE = 800;
+        const MAX_SIZE = 1200;
         let width = img.width;
         let height = img.height;
 
@@ -37,8 +37,8 @@ export async function compressImageToBase64(file) {
         const ctx = canvas.getContext('2d');
         ctx.drawImage(img, 0, 0, width, height);
 
-        // Convert to WebP format with 0.7 quality (good balance of size and quality)
-        const dataUrl = canvas.toDataURL('image/webp', 0.7);
+        // Convert to WebP format with 0.8 quality (better detail for AI verification)
+        const dataUrl = canvas.toDataURL('image/webp', 0.8);
         resolve(dataUrl);
       };
       img.onerror = (error) => reject(error);

@@ -25,10 +25,10 @@ service cloud.firestore {
       allow delete: if false;
     }
 
-    // ── TASKS (read-only for users, managed by seed script) ───────────────
+    // ── TASKS ───────────────
     match /tasks/{taskId} {
       allow read: if isAuthenticated();
-      allow write: if false; // Only seeded via admin SDK
+      allow write: if isTeacher();
     }
 
     // ── SUBMISSIONS ────────────────────────────────────────────────────────
@@ -40,7 +40,7 @@ service cloud.firestore {
       // Updates come from server-side only (verify serverless function)
       allow update: if isAuthenticated() &&
         (resource.data.userId == request.auth.uid || isTeacher());
-      allow delete: if false;
+      allow delete: if isTeacher();
     }
 
     // ── LEADERBOARD (public read, server-side write) ──────────────────────
@@ -49,10 +49,10 @@ service cloud.firestore {
       allow write: if isOwner(userId) || isTeacher(); // Also updated by awardPointsAndUpdateStreak transaction
     }
 
-    // ── REWARDS (read-only for users) ─────────────────────────────────────
+    // ── REWARDS ─────────────────────────────────────
     match /rewards/{rewardId} {
       allow read: if isAuthenticated();
-      allow write: if false;
+      allow write: if isTeacher();
     }
 
     // ── REDEMPTIONS ────────────────────────────────────────────────────────
@@ -71,10 +71,18 @@ service cloud.firestore {
         request.resource.data.userId == request.auth.uid;
       allow update: if isAuthenticated() &&
         (resource.data.userId == request.auth.uid ||
-         // Allow any authenticated user to update likes array only
-         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likes']));
+         // Allow any authenticated user to update likes and commentCount
+         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likes']) ||
+         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['commentCount']) ||
+         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likes', 'commentCount']));
       allow delete: if isAuthenticated() &&
-        resource.data.userId == request.auth.uid;
+        (resource.data.userId == request.auth.uid || isTeacher());
+        
+      match /comments/{commentId} {
+        allow read: if isAuthenticated();
+        allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+        allow update, delete: if isAuthenticated() && (resource.data.userId == request.auth.uid || isTeacher());
+      }
     }
 
     // ── GROUPS ────────────────────────────────────────────────────────────
@@ -87,6 +95,13 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // ── REPORTS ────────────────────────────────────────────────────────────
+    match /reports/{reportId} {
+      allow read, update: if isTeacher();
+      allow create: if isAuthenticated();
+      allow delete: if false;
+    }
+
     // ── NOTIFICATIONS ─────────────────────────────────────────────────────
     match /notifications/{notifId} {
       allow read: if isAuthenticated() &&
@@ -95,6 +110,27 @@ service cloud.firestore {
         resource.data.userId == request.auth.uid &&
         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']);
       allow create, delete: if false; // Server-side only
+    }
+
+    // ── SETTINGS ────────────────────────────────────────────────────────
+    match /settings/{docId} {
+      allow read: if true;
+      allow write: if isTeacher();
+    }
+
+    // ── FRAME REQUESTS ────────────────────────────────────────────────────
+    match /frameRequests/{requestId} {
+      allow read, update, delete: if isTeacher();
+      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.userId;
+    }
+
+    // ── CHATS & MESSAGES ──────────────────────────────────────────────────
+    match /chats/{chatId} {
+      allow read, write: if isAuthenticated();
+      
+      match /messages/{messageId} {
+        allow read, write: if isAuthenticated();
+      }
     }
   }
 }
