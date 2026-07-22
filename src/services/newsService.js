@@ -19,14 +19,16 @@ export async function fetchGreenNews() {
 
   _fetchPromise = (async () => {
     try {
-      const apiKey = import.meta.env.VITE_GNEWS_API_KEY;
-      if (!apiKey) {
-        throw new Error('GNews API key missing');
+      let url;
+      if (import.meta.env.DEV) {
+        // Local dev: GNews free tier allows localhost CORS
+        const apiKey = import.meta.env.VITE_GNEWS_API_KEY;
+        const query = encodeURIComponent('climate change OR environment OR sustainability OR renewable energy');
+        url = `https://gnews.io/api/v4/search?q=${query}&lang=en&max=8&apikey=${apiKey}`;
+      } else {
+        // Production: proxy through serverless function to bypass CORS
+        url = '/api/news';
       }
-
-      const query = encodeURIComponent('climate change OR environment OR sustainability OR renewable energy');
-      const url = `https://gnews.io/api/v4/search?q=${query}&lang=en&max=8&apikey=${apiKey}`;
-
       const response = await fetch(url);
 
       if (!response.ok) {
