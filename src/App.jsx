@@ -1,6 +1,6 @@
 // src/App.jsx
 import React, { useEffect } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from './lib/firebase';
 import { useAuthStore } from './store/authStore';
@@ -107,6 +107,7 @@ export default function App() {
   const { user, setUser, setProfile, setLoading, loading, profile } = useAuthStore();
   const { setTheme, setReducedMotion, setTextSize, setHighContrast } = useUiStore();
   const { settings, setSettings } = useSettingsStore();
+  const location = useLocation();
 
   // Apply saved preferences on mount
   useEffect(() => {
@@ -168,7 +169,7 @@ export default function App() {
 
   return (
     <React.Suspense fallback={<LoadingScreen />}>
-      <Routes>
+      <Routes location={location} key={location.pathname}>
         <Route path="/auth" element={<Auth />} />
         <Route
           path="/*"
@@ -179,7 +180,7 @@ export default function App() {
                   <MaintenanceScreen />
                 ) : (
                   <AppShell>
-                    <Routes>
+                    <Routes location={location} key={location.pathname}>
                       <Route path="/" element={<Home />} />
                       <Route path="/tasks" element={<Tasks />} />
                       <Route path="/leaderboard" element={<Leaderboard />} />
