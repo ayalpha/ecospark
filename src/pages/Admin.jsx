@@ -683,6 +683,18 @@ export default function Admin() {
                       🌌 Enable Supernova Frame (50,000 pts)
                     </label>
                   </div>
+
+                  <div className={styles.inputGroup}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: 'var(--text-base)', color: 'var(--color-text)' }}>
+                      <input 
+                        type="checkbox" 
+                        checked={settingsData.primeFrameEnabled ?? false} 
+                        onChange={e => setSettingsData({...settingsData, primeFrameEnabled: e.target.checked})}
+                        style={{ width: '20px', height: '20px' }}
+                      />
+                      ✨ Enable Prime Frame (999,999 pts)
+                    </label>
+                  </div>
                 </div>
               )}
 

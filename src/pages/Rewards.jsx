@@ -171,8 +171,8 @@ export default function Rewards() {
           const ownsFrame = profile?.unlockedFrames?.includes(frame.id);
           if (ownsFrame) return true;
 
-          // Otherwise, hide admin-exclusive frames, or frames disabled in global settings
-          if (frame.id === 'frame-prime') return false; 
+          // Otherwise, hide frames disabled in global settings
+          if (frame.id === 'frame-prime' && !settings?.primeFrameEnabled) return false; 
           if (frame.id === 'frame-gaia' && !settings?.gaiaFrameEnabled) return false;
           if (frame.id === 'frame-supernova' && !settings?.supernovaFrameEnabled) return false;
           
@@ -196,7 +196,7 @@ export default function Rewards() {
 
   useEffect(() => {
     loadRewards();
-  }, [profile?.unlockedFrames?.length, settings?.gaiaFrameEnabled, settings?.supernovaFrameEnabled]);
+  }, [profile?.unlockedFrames?.length, settings?.gaiaFrameEnabled, settings?.supernovaFrameEnabled, settings?.primeFrameEnabled]);
 
   const handleEquip = async (frameId) => {
     if (!user) return;
