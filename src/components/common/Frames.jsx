@@ -575,3 +575,131 @@ export const SupernovaFrame = () => (
     </g>
   </svg>
 );
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ✨ PRIME FRAME — The Ascended Admin Exclusive (UNOBTAINABLE)
+// A reality-bending, god-tier frame meant only for admins and the most elite.
+// Features: 24-point sunburst, 6-point & 12-point stars, ethereal wings, grand crown.
+// ═══════════════════════════════════════════════════════════════════════════════
+export const PrimeFrame = () => (
+  <svg viewBox="0 0 100 100" style={{ width: '100%', height: '100%', overflow: 'visible' }}>
+    <SharedDefs />
+    <defs>
+      <linearGradient id="prime-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stopColor="#FFFFFF" />
+        <stop offset="25%" stopColor="#22D3EE" />
+        <stop offset="50%" stopColor="#A855F7" />
+        <stop offset="75%" stopColor="#F472B6" />
+        <stop offset="100%" stopColor="#FDE047" />
+      </linearGradient>
+      <linearGradient id="prime-gold" x1="0%" y1="100%" x2="100%" y2="0%">
+        <stop offset="0%" stopColor="#F59E0B" />
+        <stop offset="50%" stopColor="#FEF08A" />
+        <stop offset="100%" stopColor="#D97706" />
+      </linearGradient>
+      <radialGradient id="prime-aura" cx="50%" cy="50%" r="50%">
+        <stop offset="0%" stopColor="#22D3EE" stopOpacity="0.8" />
+        <stop offset="30%" stopColor="#A855F7" stopOpacity="0.4" />
+        <stop offset="70%" stopColor="#F472B6" stopOpacity="0.1" />
+        <stop offset="100%" stopColor="#000000" stopOpacity="0" />
+      </radialGradient>
+      <filter id="prime-glow" x="-100%" y="-100%" width="300%" height="300%">
+        <feGaussianBlur stdDeviation="15" result="blur" />
+        <feComposite in="SourceGraphic" in2="blur" operator="over" />
+      </filter>
+      <filter id="prime-glow-intense" x="-100%" y="-100%" width="300%" height="300%">
+        <feGaussianBlur stdDeviation="8" result="blur" />
+        <feComponentTransfer in="blur" result="glow">
+          <feFuncA type="linear" slope="2" />
+        </feComponentTransfer>
+        <feMerge>
+          <feMergeNode in="glow" />
+          <feMergeNode in="SourceGraphic" />
+        </feMerge>
+      </filter>
+    </defs>
+    <style>{`
+      @keyframes pr-spin-f { 100% { transform: rotate(360deg); } }
+      @keyframes pr-spin-s { 100% { transform: rotate(-360deg); } }
+      @keyframes pr-pulse { 0%, 100% { transform: scale(1); opacity: 0.6; } 50% { transform: scale(1.15); opacity: 1; } }
+      @keyframes pr-float { 0%, 100% { transform: translateY(0px); } 50% { transform: translateY(-8px); } }
+      @keyframes pr-wing-l { 0%, 100% { transform: rotate(0deg); } 50% { transform: rotate(-10deg); } }
+      @keyframes pr-wing-r { 0%, 100% { transform: rotate(0deg); } 50% { transform: rotate(10deg); } }
+      @keyframes pr-star { 0%, 100% { transform: scale(0); opacity: 0; } 50% { transform: scale(2); opacity: 1; } }
+      .pr-sf { transform-origin: 50px 50px; animation: pr-spin-f 12s linear infinite; }
+      .pr-ss { transform-origin: 50px 50px; animation: pr-spin-s 25s linear infinite; }
+      .pr-p { transform-origin: 50px 50px; animation: pr-pulse 3s ease-in-out infinite; }
+      .pr-c { transform-origin: 50px 0px; animation: pr-float 3s ease-in-out infinite; }
+      .pr-wl { transform-origin: 20px 50px; animation: pr-wing-l 4s ease-in-out infinite; }
+      .pr-wr { transform-origin: 80px 50px; animation: pr-wing-r 4s ease-in-out infinite; }
+      .pr-st1 { transform-origin: center; animation: pr-star 2s ease-in-out infinite 0s; }
+      .pr-st2 { transform-origin: center; animation: pr-star 2s ease-in-out infinite 0.5s; }
+      .pr-st3 { transform-origin: center; animation: pr-star 2s ease-in-out infinite 1s; }
+      .pr-st4 { transform-origin: center; animation: pr-star 2s ease-in-out infinite 1.5s; }
+    `}</style>
+    <g mask="url(#center-hole)">
+      {/* 1. Base Aura */}
+      <circle cx="50" cy="50" r="50" fill="url(#prime-aura)" filter="url(#prime-glow)" className="pr-p" />
+      
+      {/* 2. Sunburst Rays */}
+      <g className="pr-ss">
+        {[...Array(24)].map((_, i) => (
+          <line key={i} x1="50" y1="50" x2={50 + 55 * Math.cos((i * 15 * Math.PI) / 180)} y2={50 + 55 * Math.sin((i * 15 * Math.PI) / 180)} stroke="url(#prime-grad)" strokeWidth="0.8" opacity="0.4" />
+        ))}
+      </g>
+
+      {/* 3. Outer Hexagram (6-point star) */}
+      <g className="pr-sf">
+        <polygon points="50,2 91,26 91,74 50,98 9,74 9,26" fill="none" stroke="url(#prime-grad)" strokeWidth="1" filter="url(#glow-md)" opacity="0.6" />
+        <polygon points="50,2 91,26 91,74 50,98 9,74 9,26" fill="none" stroke="#FFFFFF" strokeWidth="0.5" transform="rotate(30 50 50)" opacity="0.4" />
+      </g>
+
+      {/* 4. Orbiting Energy Spheres */}
+      <g className="pr-ss">
+        {[0, 90, 180, 270].map((angle, i) => (
+          <circle key={i} cx={50 + 46 * Math.cos((angle * Math.PI) / 180)} cy={50 + 46 * Math.sin((angle * Math.PI) / 180)} r="4" fill="#FFFFFF" filter="url(#prime-glow-intense)" />
+        ))}
+      </g>
+
+      {/* 5. Ethereal Wings (Left & Right) */}
+      <g className="pr-wl">
+        <path d="M 12 40 Q -10 20 2 0 Q 5 25 18 35 Z" fill="url(#prime-grad)" opacity="0.8" filter="url(#glow-lg)" />
+        <path d="M 12 50 Q -15 40 -5 20 Q 2 40 18 45 Z" fill="url(#prime-grad)" opacity="0.6" filter="url(#glow-md)" />
+        <path d="M 15 60 Q -5 60 0 80 Q 5 65 20 55 Z" fill="url(#prime-grad)" opacity="0.7" filter="url(#glow-lg)" />
+      </g>
+      <g className="pr-wr">
+        <path d="M 88 40 Q 110 20 98 0 Q 95 25 82 35 Z" fill="url(#prime-grad)" opacity="0.8" filter="url(#glow-lg)" />
+        <path d="M 88 50 Q 115 40 105 20 Q 98 40 82 45 Z" fill="url(#prime-grad)" opacity="0.6" filter="url(#glow-md)" />
+        <path d="M 85 60 Q 105 60 100 80 Q 95 65 80 55 Z" fill="url(#prime-grad)" opacity="0.7" filter="url(#glow-lg)" />
+      </g>
+
+      {/* 6. Core Golden Ring */}
+      <circle cx="50" cy="50" r="43" fill="none" stroke="url(#prime-gold)" strokeWidth="6" filter="url(#prime-glow-intense)" />
+      <circle cx="50" cy="50" r="45" fill="none" stroke="#FFFFFF" strokeWidth="1" opacity="0.8" />
+      <circle cx="50" cy="50" r="41" fill="none" stroke="#FFFFFF" strokeWidth="1" opacity="0.8" />
+
+      {/* 7. The Ultimate Crown */}
+      <g className="pr-c">
+        {/* Giant Halo Behind Crown */}
+        <circle cx="50" cy="-10" r="15" fill="none" stroke="#FDE047" strokeWidth="1.5" opacity="0.8" filter="url(#glow-xl)" className="pr-p" />
+        <path d="M 20 15 L 35 -15 L 50 -25 L 65 -15 L 80 15 L 65 10 L 50 15 L 35 10 Z" fill="url(#prime-gold)" stroke="#FFFFFF" strokeWidth="1" filter="url(#prime-glow-intense)" />
+        <circle cx="50" cy="-25" r="5" fill="#FFFFFF" filter="url(#prime-glow-intense)" />
+        <circle cx="35" cy="-15" r="3.5" fill="#22D3EE" filter="url(#glow-md)" />
+        <circle cx="65" cy="-15" r="3.5" fill="#F472B6" filter="url(#glow-md)" />
+        <path d="M 38 5 L 50 -10 L 62 5" fill="none" stroke="#FFFFFF" strokeWidth="1.5" opacity="0.6" />
+      </g>
+
+      {/* 8. Blinding Stars */}
+      <g className="pr-st1" transform="translate(15, 15)"><polygon points="0,-4 1,-1 4,0 1,1 0,4 -1,1 -4,0 -1,-1" fill="#FFFFFF" filter="url(#glow-lg)" /></g>
+      <g className="pr-st2" transform="translate(85, 15)"><polygon points="0,-4 1,-1 4,0 1,1 0,4 -1,1 -4,0 -1,-1" fill="#FFFFFF" filter="url(#glow-lg)" /></g>
+      <g className="pr-st3" transform="translate(15, 85)"><polygon points="0,-4 1,-1 4,0 1,1 0,4 -1,1 -4,0 -1,-1" fill="#FFFFFF" filter="url(#glow-lg)" /></g>
+      <g className="pr-st4" transform="translate(85, 85)"><polygon points="0,-4 1,-1 4,0 1,1 0,4 -1,1 -4,0 -1,-1" fill="#FFFFFF" filter="url(#glow-lg)" /></g>
+
+      {/* 9. Bottom Floating Runes / Orbs */}
+      <path d="M 30 95 Q 50 115 70 95" fill="none" stroke="url(#prime-grad)" strokeWidth="2" filter="url(#glow-lg)" opacity="0.8" />
+      <circle cx="50" cy="105" r="4" fill="#FFFFFF" filter="url(#prime-glow-intense)" />
+      <circle cx="40" cy="100" r="2" fill="#22D3EE" filter="url(#glow-md)" />
+      <circle cx="60" cy="100" r="2" fill="#F472B6" filter="url(#glow-md)" />
+    </g>
+  </svg>
+);

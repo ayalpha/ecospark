@@ -817,6 +817,7 @@ export default function Admin() {
                   onChange={(e) => setFrameModal({ ...frameModal, frameId: e.target.value })}
                   style={{ padding: '10px', background: 'var(--color-bg-card)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-sm)', color: 'var(--color-text)' }}
                 >
+                  <option value="frame-prime">✨ PRIME FRAME (Admin Exclusive)</option>
                   <option value="frame-supernova">🌌 Supernova Frame (Legendary)</option>
                   <option value="frame-gaia">🌿 Gaia Crown Frame (Legendary)</option>
                   <option value="frame-god">👑 God Frame (Ultimate Celestial)</option>

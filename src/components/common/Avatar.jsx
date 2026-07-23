@@ -1,5 +1,5 @@
 import React from 'react';
-import { BronzeFrame, SilverFrame, GoldFrame, PlatinumFrame, GodFrame, GaiaFrame, SupernovaFrame } from './Frames';
+import { BronzeFrame, SilverFrame, GoldFrame, PlatinumFrame, GodFrame, GaiaFrame, SupernovaFrame, PrimeFrame } from './Frames';
 import styles from './Avatar.module.css';
 
 const FRAME_COMPONENTS = {
@@ -10,6 +10,7 @@ const FRAME_COMPONENTS = {
   'frame-god': GodFrame,
   'frame-gaia': GaiaFrame,
   'frame-supernova': SupernovaFrame,
+  'frame-prime': PrimeFrame,
 };
 
 export default function Avatar({ src, activeFrame, size = 48, alt = 'Avatar', className = '', style = {} }) {
