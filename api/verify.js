@@ -112,19 +112,19 @@ You must be STRICT and ACCURATE:
 - Do not accept unrelated screenshots, memes, random objects, or selfies without context.
 
 Respond with a confidence score where:
-- 0.8-1.0 = The photo clearly and definitively shows the claimed eco-friendly action.
-- 0.4-0.79 = The photo might be related, but is ambiguous or lacks clear evidence.
-- 0.0-0.39 = The photo is completely unrelated to the prompt or does not demonstrate the action at all.`;
+- 0.5-1.0 = The photo clearly and definitively shows the claimed eco-friendly action.
+- 0.3-0.49 = The photo might be related, but is ambiguous or lacks clear evidence.
+- 0.0-0.29 = The photo is completely unrelated to the prompt or does not demonstrate the action at all.`;
 
     const result = await callGeminiWithRetry(imagePart, verificationPrompt);
 
     // Confidence-tiered decision
     const confidence = result.confidence ?? 0.5;
     let status;
-    if (confidence >= 0.8) {
+    if (confidence >= 0.5) {
       // High confidence — auto-approve
       status = 'approved';
-    } else if (confidence >= 0.4) {
+    } else if (confidence >= 0.3) {
       // Medium confidence — flag for manual review, don't auto approve
       status = 'flagged';
     } else {
@@ -134,10 +134,10 @@ Respond with a confidence score where:
 
     await submissionRef.update({
       status,
-      aiVerdict: confidence >= 0.8,
+      aiVerdict: confidence >= 0.5,
       confidence,
       reason: result.reason,
-      needsAudit: confidence >= 0.4 && confidence < 0.8,
+      needsAudit: confidence >= 0.3 && confidence < 0.5,
       approvedAt: status === 'approved' ? admin.firestore.FieldValue.serverTimestamp() : null,
       flaggedAt: status === 'flagged' ? admin.firestore.FieldValue.serverTimestamp() : null,
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
