@@ -88,10 +88,7 @@ export default function Admin() {
       } else if (tab === 'rewards') {
         const r = await getRewards();
         setRewardsData(r);
-      } else if (tab === 'requests') {
-        const reqs = await getFrameRequests();
-        setFrameRequests(reqs);
-      } else if (tab === 'settings') {
+      } else if (tab === 'frames' || tab === 'settings') {
         const setg = await getGlobalSettings();
         setSettingsData(setg);
       }
@@ -698,67 +695,6 @@ export default function Admin() {
                 </div>
               )}
 
-              {/* Pending Requests */}
-              <div className={styles.chartCard} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                <h3 className={styles.chartTitle} style={{ margin: 0 }}>Pending User Requests</h3>
-                {loading ? (
-                  <div className={styles.grid}>
-                    {Array.from({ length: 3 }).map((_, i) => <div key={i} className={`skeleton ${styles.cardSkel}`} />)}
-                  </div>
-                ) : frameRequests.length === 0 ? (
-                  <div className={styles.empty}>
-                    <PremiumIcon icon={Inbox} color="slate" size={32} />
-                    <p>No pending frame requests.</p>
-                  </div>
-                ) : (
-                  <div className={styles.grid}>
-                    {frameRequests.map((req) => (
-                      <motion.div key={req.id} className={styles.card} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} style={{ padding: '20px' }}>
-                        <div className={styles.cardBody} style={{ padding: 0 }}>
-                          <p className={styles.cardId}>Request ID: {req.id.slice(0, 8)}</p>
-                          <h3 style={{ margin: '8px 0', fontSize: 'var(--text-lg)', color: 'var(--color-text)' }}>{req.displayName}</h3>
-                          <p className={styles.cardReason}>
-                            Requested the <strong>{req.frameId}</strong> frame.
-                          </p>
-                          <p className={styles.cardConf} style={{ marginTop: '12px' }}>
-                            Check their profile/streak to determine if they are worthy!
-                          </p>
-                        </div>
-                        <div className={styles.cardActions} style={{ padding: '16px 0 0 0', marginTop: '16px', borderTop: '1px solid var(--color-border)' }}>
-                          <button 
-                            className={styles.approveBtn} 
-                            onClick={async () => {
-                              try {
-                                await resolveFrameRequest(req.id, 'approved', req.userId, req.frameId);
-                                setFrameRequests(prev => prev.filter(r => r.id !== req.id));
-                                toast.success(`Frame awarded to ${req.displayName}!`);
-                              } catch (err) {
-                                toast.error('Failed to award frame');
-                              }
-                            }}
-                          >
-                            <PremiumIcon icon={CheckSquare} color="white" size={16} /> Award Frame
-                          </button>
-                          <button 
-                            className={styles.rejectBtn} 
-                            onClick={async () => {
-                              try {
-                                await resolveFrameRequest(req.id, 'rejected', req.userId, req.frameId);
-                                setFrameRequests(prev => prev.filter(r => r.id !== req.id));
-                                toast.success(`Request rejected.`);
-                              } catch (err) {
-                                toast.error('Failed to reject request');
-                              }
-                            }}
-                          >
-                            <PremiumIcon icon={XCircle} color="white" size={16} /> Reject
-                          </button>
-                        </div>
-                      </motion.div>
-                    ))}
-                  </div>
-                )}
-              </div>
             </div>
           )}
 
