@@ -2,8 +2,13 @@ import { db } from '../lib/firebase';
 import { collection, getDocs, doc, updateDoc, increment, deleteDoc, getDoc, query, where, orderBy, getCountFromServer, serverTimestamp, Timestamp, setDoc, arrayUnion } from 'firebase/firestore';
 
 export async function getAdminUsers() {
-  const usersSnap = await getDocs(query(collection(db, 'users'), orderBy('createdAt', 'desc')));
-  return usersSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+  const usersSnap = await getDocs(collection(db, 'users'));
+  const users = usersSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+  return users.sort((a, b) => {
+    const tA = a.createdAt?.toMillis ? a.createdAt.toMillis() : 0;
+    const tB = b.createdAt?.toMillis ? b.createdAt.toMillis() : 0;
+    return tB - tA;
+  });
 }
 
 export async function adminUpdateUserPoints(userId, pointsToAdd) {

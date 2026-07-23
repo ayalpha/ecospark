@@ -140,6 +140,14 @@ export default function App() {
             import('react-hot-toast').then(({ default: toast }) => toast.error('This account has been banned by an administrator.'));
             return;
           }
+          
+          // Sync email if it was changed via Firebase Auth
+          if (profile && firebaseUser.email && profile.email !== firebaseUser.email) {
+            import('./services/firestoreService').then(({ updateUserProfile }) => {
+              updateUserProfile(firebaseUser.uid, { email: firebaseUser.email }).catch(console.error);
+            });
+          }
+
           setProfile(profile);
           setLoading(false);
         });
