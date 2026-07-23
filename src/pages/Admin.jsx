@@ -20,7 +20,7 @@ const TABS = [
   { id: 'past', label: 'Past Submissions' },
   { id: 'tasks', label: 'Tasks' },
   { id: 'rewards', label: 'Rewards' },
-  { id: 'requests', label: 'Frame Requests' },
+  { id: 'frames', label: 'Frames' },
   { id: 'settings', label: 'Settings' }
 ];
 
@@ -46,6 +46,7 @@ export default function Admin() {
   // Modals
   const [pointsModal, setPointsModal] = useState({ open: false, user: null, amount: 0 });
   const [frameModal, setFrameModal] = useState({ open: false, user: null, frameId: 'frame-god' });
+  const [directAward, setDirectAward] = useState({ userId: '', frameId: 'frame-prime' });
   const [taskModal, setTaskModal] = useState({ open: false, task: null });
   const [rewardModal, setRewardModal] = useState({ open: false, reward: null });
 
@@ -642,65 +643,172 @@ export default function Admin() {
             </div>
           )}
 
-          {/* TAB 8: FRAME REQUESTS */}
-          {activeTab === 'requests' && (
-            loading ? (
-              <div className={styles.grid}>
-                {Array.from({ length: 3 }).map((_, i) => <div key={i} className={`skeleton ${styles.cardSkel}`} />)}
-              </div>
-            ) : frameRequests.length === 0 ? (
-              <div className={styles.empty}>
-                <PremiumIcon icon={Inbox} color="slate" size={32} />
-                <p>No pending frame requests.</p>
-              </div>
-            ) : (
-              <div className={styles.grid}>
-                {frameRequests.map((req) => (
-                  <motion.div key={req.id} className={styles.card} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} style={{ padding: '20px' }}>
-                    <div className={styles.cardBody} style={{ padding: 0 }}>
-                      <p className={styles.cardId}>Request ID: {req.id.slice(0, 8)}</p>
-                      <h3 style={{ margin: '8px 0', fontSize: 'var(--text-lg)', color: 'var(--color-text)' }}>{req.displayName}</h3>
-                      <p className={styles.cardReason}>
-                        Requested the <strong>{req.frameId}</strong> frame.
-                      </p>
-                      <p className={styles.cardConf} style={{ marginTop: '12px' }}>
-                        Check their profile/streak to determine if they are worthy!
-                      </p>
+          {/* TAB 8: FRAMES (Settings, Direct Award & Requests) */}
+          {activeTab === 'frames' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '30px' }}>
+              
+              {/* Legendary Frame Settings */}
+              {settingsData && (
+                <div className={styles.chartCard} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                      <h3 className={styles.chartTitle} style={{ margin: 0 }}>Legendary Frame Visibility</h3>
+                      <p style={{ margin: '4px 0 0 0', color: 'var(--color-text-secondary)', fontSize: 'var(--text-sm)' }}>Toggle whether legendary frames appear in the Rewards shop.</p>
                     </div>
-                    <div className={styles.cardActions} style={{ padding: '16px 0 0 0', marginTop: '16px', borderTop: '1px solid var(--color-border)' }}>
-                      <button 
-                        className={styles.approveBtn} 
-                        onClick={async () => {
-                          try {
-                            await resolveFrameRequest(req.id, 'approved', req.userId, req.frameId);
-                            setFrameRequests(prev => prev.filter(r => r.id !== req.id));
-                            toast.success(`Frame awarded to ${req.displayName}!`);
-                          } catch (err) {
-                            toast.error('Failed to award frame');
-                          }
-                        }}
-                      >
-                        <PremiumIcon icon={CheckSquare} color="white" size={16} /> Award Frame
-                      </button>
-                      <button 
-                        className={styles.rejectBtn} 
-                        onClick={async () => {
-                          try {
-                            await resolveFrameRequest(req.id, 'rejected', req.userId, req.frameId);
-                            setFrameRequests(prev => prev.filter(r => r.id !== req.id));
-                            toast.success(`Request rejected.`);
-                          } catch (err) {
-                            toast.error('Failed to reject request');
-                          }
-                        }}
-                      >
-                        <PremiumIcon icon={XCircle} color="white" size={16} /> Reject
-                      </button>
-                    </div>
-                  </motion.div>
-                ))}
+                    <button onClick={handleSaveSettings} className={styles.approveBtn} style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <PremiumIcon icon={Save} color="white" size={16} /> Save Settings
+                    </button>
+                  </div>
+
+                  <div className={styles.inputGroup}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: 'var(--text-base)', color: 'var(--color-text)' }}>
+                      <input 
+                        type="checkbox" 
+                        checked={settingsData.gaiaFrameEnabled ?? false} 
+                        onChange={e => setSettingsData({...settingsData, gaiaFrameEnabled: e.target.checked})}
+                        style={{ width: '20px', height: '20px' }}
+                      />
+                      🌿 Enable Gaia Crown Frame (25,000 pts)
+                    </label>
+                  </div>
+
+                  <div className={styles.inputGroup}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: 'var(--text-base)', color: 'var(--color-text)' }}>
+                      <input 
+                        type="checkbox" 
+                        checked={settingsData.supernovaFrameEnabled ?? false} 
+                        onChange={e => setSettingsData({...settingsData, supernovaFrameEnabled: e.target.checked})}
+                        style={{ width: '20px', height: '20px' }}
+                      />
+                      🌌 Enable Supernova Frame (50,000 pts)
+                    </label>
+                  </div>
+                </div>
+              )}
+
+              {/* Direct Frame Award */}
+              <div className={styles.chartCard} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                <div>
+                  <h3 className={styles.chartTitle} style={{ margin: 0 }}>Gift / Award a Frame</h3>
+                  <p style={{ margin: '4px 0 0 0', color: 'var(--color-text-secondary)', fontSize: 'var(--text-sm)' }}>Directly grant a frame to any user, including the Admin-Exclusive Prime Frame.</p>
+                </div>
+                
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                  <div className={styles.inputGroup}>
+                    <label>Select User</label>
+                    <select 
+                      value={directAward.userId}
+                      onChange={e => setDirectAward({...directAward, userId: e.target.value})}
+                      style={{ padding: '10px', background: 'var(--color-bg-card)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-sm)', color: 'var(--color-text)' }}
+                    >
+                      <option value="">-- Choose a user --</option>
+                      {users.map(u => (
+                        <option key={u.id} value={u.id}>{u.displayName} ({u.email})</option>
+                      ))}
+                    </select>
+                  </div>
+                  
+                  <div className={styles.inputGroup}>
+                    <label>Select Frame</label>
+                    <select 
+                      value={directAward.frameId} 
+                      onChange={(e) => setDirectAward({ ...directAward, frameId: e.target.value })}
+                      style={{ padding: '10px', background: 'var(--color-bg-card)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-sm)', color: 'var(--color-text)' }}
+                    >
+                      <option value="frame-prime">✨ PRIME FRAME (Admin Exclusive)</option>
+                      <option value="frame-supernova">🌌 Supernova Frame (Legendary)</option>
+                      <option value="frame-gaia">🌿 Gaia Crown Frame (Legendary)</option>
+                      <option value="frame-god">👑 God Frame (Ultimate Celestial)</option>
+                      <option value="frame-platinum">💎 Platinum Frame</option>
+                      <option value="frame-gold">🥇 Gold Frame</option>
+                      <option value="frame-silver">🥈 Silver Frame</option>
+                      <option value="frame-bronze">🥉 Bronze Frame</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
+                  <button 
+                    className={styles.approveBtn} 
+                    style={{ padding: '10px 24px', display: 'flex', alignItems: 'center', gap: '8px' }}
+                    onClick={async () => {
+                      if (!directAward.userId) return toast.error('Please select a user');
+                      try {
+                        await adminAwardFrame(directAward.userId, directAward.frameId);
+                        toast.success('Frame successfully awarded!');
+                        setDirectAward({ ...directAward, userId: '' }); // reset user selection
+                      } catch (e) {
+                        toast.error('Failed to award frame');
+                      }
+                    }}
+                  >
+                    <PremiumIcon icon={CheckSquare} color="white" size={16} /> Award Frame Now
+                  </button>
+                </div>
               </div>
-            )
+
+              {/* Pending Requests */}
+              <div className={styles.chartCard} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                <h3 className={styles.chartTitle} style={{ margin: 0 }}>Pending User Requests</h3>
+                {loading ? (
+                  <div className={styles.grid}>
+                    {Array.from({ length: 3 }).map((_, i) => <div key={i} className={`skeleton ${styles.cardSkel}`} />)}
+                  </div>
+                ) : frameRequests.length === 0 ? (
+                  <div className={styles.empty}>
+                    <PremiumIcon icon={Inbox} color="slate" size={32} />
+                    <p>No pending frame requests.</p>
+                  </div>
+                ) : (
+                  <div className={styles.grid}>
+                    {frameRequests.map((req) => (
+                      <motion.div key={req.id} className={styles.card} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} style={{ padding: '20px' }}>
+                        <div className={styles.cardBody} style={{ padding: 0 }}>
+                          <p className={styles.cardId}>Request ID: {req.id.slice(0, 8)}</p>
+                          <h3 style={{ margin: '8px 0', fontSize: 'var(--text-lg)', color: 'var(--color-text)' }}>{req.displayName}</h3>
+                          <p className={styles.cardReason}>
+                            Requested the <strong>{req.frameId}</strong> frame.
+                          </p>
+                          <p className={styles.cardConf} style={{ marginTop: '12px' }}>
+                            Check their profile/streak to determine if they are worthy!
+                          </p>
+                        </div>
+                        <div className={styles.cardActions} style={{ padding: '16px 0 0 0', marginTop: '16px', borderTop: '1px solid var(--color-border)' }}>
+                          <button 
+                            className={styles.approveBtn} 
+                            onClick={async () => {
+                              try {
+                                await resolveFrameRequest(req.id, 'approved', req.userId, req.frameId);
+                                setFrameRequests(prev => prev.filter(r => r.id !== req.id));
+                                toast.success(`Frame awarded to ${req.displayName}!`);
+                              } catch (err) {
+                                toast.error('Failed to award frame');
+                              }
+                            }}
+                          >
+                            <PremiumIcon icon={CheckSquare} color="white" size={16} /> Award Frame
+                          </button>
+                          <button 
+                            className={styles.rejectBtn} 
+                            onClick={async () => {
+                              try {
+                                await resolveFrameRequest(req.id, 'rejected', req.userId, req.frameId);
+                                setFrameRequests(prev => prev.filter(r => r.id !== req.id));
+                                toast.success(`Request rejected.`);
+                              } catch (err) {
+                                toast.error('Failed to reject request');
+                              }
+                            }}
+                          >
+                            <PremiumIcon icon={XCircle} color="white" size={16} /> Reject
+                          </button>
+                        </div>
+                      </motion.div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
           )}
 
           {/* TAB 9: GLOBAL SETTINGS */}
@@ -740,34 +848,6 @@ export default function Admin() {
                   value={settingsData.pointsMultiplier || 1} 
                   onChange={e => setSettingsData({...settingsData, pointsMultiplier: parseFloat(e.target.value)})}
                 />
-              </div>
-
-              <hr style={{ border: 'none', borderTop: '1px solid var(--color-border)', margin: '8px 0' }} />
-              <h4 style={{ margin: 0, color: 'var(--color-text)', fontFamily: 'var(--font-display)', fontSize: 'var(--text-lg)' }}>🌿 Legendary Frame Visibility</h4>
-              <p style={{ margin: 0, color: 'var(--color-text-secondary)', fontSize: 'var(--text-sm)' }}>Toggle whether legendary frames appear in the Rewards shop for students.</p>
-
-              <div className={styles.inputGroup}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: 'var(--text-base)', color: 'var(--color-text)' }}>
-                  <input 
-                    type="checkbox" 
-                    checked={settingsData.gaiaFrameEnabled ?? false} 
-                    onChange={e => setSettingsData({...settingsData, gaiaFrameEnabled: e.target.checked})}
-                    style={{ width: '20px', height: '20px' }}
-                  />
-                  🌿 Enable Gaia Crown Frame (25,000 pts)
-                </label>
-              </div>
-
-              <div className={styles.inputGroup}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: 'var(--text-base)', color: 'var(--color-text)' }}>
-                  <input 
-                    type="checkbox" 
-                    checked={settingsData.supernovaFrameEnabled ?? false} 
-                    onChange={e => setSettingsData({...settingsData, supernovaFrameEnabled: e.target.checked})}
-                    style={{ width: '20px', height: '20px' }}
-                  />
-                  🌌 Enable Supernova Frame (50,000 pts)
-                </label>
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'flex-start', marginTop: '16px' }}>
