@@ -52,8 +52,8 @@
   transform: translateY(-30px);
 }
 
-.podiumMedal { position: absolute; top: -20px; left: 50%; transform: translateX(-50%); z-index: 10; filter: drop-shadow(0 8px 16px rgba(0,0,0,0.5)); }
-.podiumFirst .podiumMedal { top: -28px; }
+.podiumMedal { position: absolute; bottom: -20px; left: 50%; transform: translateX(-50%); z-index: 10; filter: drop-shadow(0 8px 16px rgba(0,0,0,0.5)); }
+.podiumFirst .podiumMedal { bottom: -24px; }
 
 .podiumName { font-size: var(--text-base); font-weight: 700; color: var(--color-text); text-align: center; max-width: 120px; text-overflow: ellipsis; white-space: nowrap; overflow: visible; }
 .podiumFirst .podiumName { font-size: var(--text-lg); color: var(--color-gold); font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; text-shadow: 0 0 16px rgba(245,158,11,0.5); max-width: 150px; }

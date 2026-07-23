@@ -698,67 +698,6 @@ export default function Admin() {
                 </div>
               )}
 
-              {/* Direct Frame Award */}
-              <div className={styles.chartCard} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                <div>
-                  <h3 className={styles.chartTitle} style={{ margin: 0 }}>Gift / Award a Frame</h3>
-                  <p style={{ margin: '4px 0 0 0', color: 'var(--color-text-secondary)', fontSize: 'var(--text-sm)' }}>Directly grant a frame to any user, including the Admin-Exclusive Prime Frame.</p>
-                </div>
-                
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                  <div className={styles.inputGroup}>
-                    <label>Select User</label>
-                    <select 
-                      value={directAward.userId}
-                      onChange={e => setDirectAward({...directAward, userId: e.target.value})}
-                      style={{ padding: '10px', background: 'var(--color-bg-card)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-sm)', color: 'var(--color-text)' }}
-                    >
-                      <option value="">-- Choose a user --</option>
-                      {users.map(u => (
-                        <option key={u.id} value={u.id}>{u.displayName} ({u.email})</option>
-                      ))}
-                    </select>
-                  </div>
-                  
-                  <div className={styles.inputGroup}>
-                    <label>Select Frame</label>
-                    <select 
-                      value={directAward.frameId} 
-                      onChange={(e) => setDirectAward({ ...directAward, frameId: e.target.value })}
-                      style={{ padding: '10px', background: 'var(--color-bg-card)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-sm)', color: 'var(--color-text)' }}
-                    >
-                      <option value="frame-prime">✨ PRIME FRAME (Admin Exclusive)</option>
-                      <option value="frame-supernova">🌌 Supernova Frame (Legendary)</option>
-                      <option value="frame-gaia">🌿 Gaia Crown Frame (Legendary)</option>
-                      <option value="frame-god">👑 God Frame (Ultimate Celestial)</option>
-                      <option value="frame-platinum">💎 Platinum Frame</option>
-                      <option value="frame-gold">🥇 Gold Frame</option>
-                      <option value="frame-silver">🥈 Silver Frame</option>
-                      <option value="frame-bronze">🥉 Bronze Frame</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
-                  <button 
-                    className={styles.approveBtn} 
-                    style={{ padding: '10px 24px', display: 'flex', alignItems: 'center', gap: '8px' }}
-                    onClick={async () => {
-                      if (!directAward.userId) return toast.error('Please select a user');
-                      try {
-                        await adminAwardFrame(directAward.userId, directAward.frameId);
-                        toast.success('Frame successfully awarded!');
-                        setDirectAward({ ...directAward, userId: '' }); // reset user selection
-                      } catch (e) {
-                        toast.error('Failed to award frame');
-                      }
-                    }}
-                  >
-                    <PremiumIcon icon={CheckSquare} color="white" size={16} /> Award Frame Now
-                  </button>
-                </div>
-              </div>
-
               {/* Pending Requests */}
               <div className={styles.chartCard} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                 <h3 className={styles.chartTitle} style={{ margin: 0 }}>Pending User Requests</h3>
