@@ -92,78 +92,76 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'submissionId, imageUrl, and taskPrompt required' });
   }
 
-  // Immediately acknowledge — client listens via onSnapshot
-  res.status(202).json({ submissionId, status: 'pending' });
+  const submissionRef = db.collection('submissions').doc(submissionId);
 
-  // Process asynchronously after response is sent
-  setImmediate(async () => {
-    const submissionRef = db.collection('submissions').doc(submissionId);
+  try {
+    // Ensure doc exists with pending status
+    await submissionRef.set({ status: 'pending', updatedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
 
-    try {
-      // Ensure doc exists with pending status
-      await submissionRef.set({ status: 'pending', updatedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
-
-      const imagePart = await fetchImageAsBase64(imageUrl);
-      const verificationPrompt = `You are verifying a student's eco-action photo submission for a sustainability app.
+    const imagePart = await fetchImageAsBase64(imageUrl);
+    const verificationPrompt = `You are verifying a student's eco-action photo submission for a sustainability app.
 
 The student claims they completed this action: "${taskPrompt}"
 
-Please evaluate whether the photo shows reasonable evidence of this eco-friendly action being performed or completed.
+Please evaluate whether the photo provides strong evidence of this eco-friendly action being performed or completed.
 
-Be EXTREMELY LENIENT. Give the student the maximum benefit of the doubt.
-- Accept poor lighting, blur, weird angles, or partial framing.
-- Accept indirect evidence (e.g. holding a reusable bottle, standing near a bin, turning off a light switch).
-- Do not expect a perfect, staged photo. Real-world photos are messy.
-- Only reject if it is a completely unrelated image (like a screenshot, a meme, or a completely black photo).
+You must be STRICT and ACCURATE:
+- Carefully verify if the photo actually demonstrates the exact action claimed.
+- If the photo is completely unrelated to the prompt, you must reject it.
+- If the photo does not clearly show the claimed action, reject it.
+- Do not accept unrelated screenshots, memes, random objects, or selfies without context.
 
 Respond with a confidence score where:
-- 0.7-1.0 = clearly shows the action or reasonable evidence
-- 0.4-0.69 = somewhat related, plausible but not definitive
-- 0.0-0.39 = unrelated or clearly not the claimed action`;
+- 0.8-1.0 = The photo clearly and definitively shows the claimed eco-friendly action.
+- 0.4-0.79 = The photo might be related, but is ambiguous or lacks clear evidence.
+- 0.0-0.39 = The photo is completely unrelated to the prompt or does not demonstrate the action at all.`;
 
-      const result = await callGeminiWithRetry(imagePart, verificationPrompt);
+    const result = await callGeminiWithRetry(imagePart, verificationPrompt);
 
-      // Confidence-tiered decision
-      const confidence = result.confidence ?? 0.5;
-      let status;
-      if (confidence >= 0.7) {
-        // High confidence — auto-approve
-        status = 'approved';
-      } else if (confidence >= 0.4) {
-        // Medium confidence — auto-approve but mark for audit
-        status = 'approved';
-      } else {
-        // Low confidence — flag for manual review
-        status = 'flagged';
-      }
-
-      await submissionRef.update({
-        status,
-        aiVerdict: confidence >= 0.4,
-        confidence,
-        reason: result.reason,
-        needsAudit: confidence >= 0.4 && confidence < 0.7,
-        approvedAt: status === 'approved' ? admin.firestore.FieldValue.serverTimestamp() : null,
-        flaggedAt: status === 'flagged' ? admin.firestore.FieldValue.serverTimestamp() : null,
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-      });
-
-    } catch (err) {
-      console.error('[verify] Error:', err);
-      const isTimeout = err.name === 'AbortError' || err.message?.includes('aborted');
-      const isRateLimit = err.status === 429 || err.message?.includes('429');
-
-      await submissionRef.update({
-        status: 'flagged',
-        reason: isRateLimit
-          ? 'AI rate limit reached — flagged for manual review'
-          : isTimeout
-          ? 'Verification timed out — flagged for manual review'
-          : `Verification error: ${err.message}`,
-        error: err.message,
-        flaggedAt: admin.firestore.FieldValue.serverTimestamp(),
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-      });
+    // Confidence-tiered decision
+    const confidence = result.confidence ?? 0.5;
+    let status;
+    if (confidence >= 0.8) {
+      // High confidence — auto-approve
+      status = 'approved';
+    } else if (confidence >= 0.4) {
+      // Medium confidence — flag for manual review, don't auto approve
+      status = 'flagged';
+    } else {
+      // Low confidence — flag for manual review
+      status = 'flagged';
     }
-  });
+
+    await submissionRef.update({
+      status,
+      aiVerdict: confidence >= 0.8,
+      confidence,
+      reason: result.reason,
+      needsAudit: confidence >= 0.4 && confidence < 0.8,
+      approvedAt: status === 'approved' ? admin.firestore.FieldValue.serverTimestamp() : null,
+      flaggedAt: status === 'flagged' ? admin.firestore.FieldValue.serverTimestamp() : null,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    return res.status(200).json({ submissionId, status, reason: result.reason, confidence });
+
+  } catch (err) {
+    console.error('[verify] Error:', err);
+    const isTimeout = err.name === 'AbortError' || err.message?.includes('aborted');
+    const isRateLimit = err.status === 429 || err.message?.includes('429');
+
+    await submissionRef.update({
+      status: 'flagged',
+      reason: isRateLimit
+        ? 'AI rate limit reached — flagged for manual review'
+        : isTimeout
+        ? 'Verification timed out — flagged for manual review'
+        : `Verification error: ${err.message}`,
+      error: err.message,
+      flaggedAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    return res.status(500).json({ error: 'Verification failed', details: err.message });
+  }
 }
