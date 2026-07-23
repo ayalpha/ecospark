@@ -5,6 +5,7 @@ import { useAuthStore } from '../store/authStore';
 import { getRewards, redeemReward, equipFrame, unequipFrame, subscribeUserTransactions } from '../services/firestoreService';
 import { BronzeFrame, SilverFrame, GoldFrame, PlatinumFrame, GodFrame, GaiaFrame, SupernovaFrame } from '../components/common/Frames';
 import toast from 'react-hot-toast';
+import { useSettingsStore } from '../store/settingsStore';
 import styles from './Rewards.module.css';
 
 const FRAME_COMPONENTS = {
@@ -160,7 +161,14 @@ export default function Rewards() {
     getRewards()
       .then((fetched) => {
         const combined = [...fetched];
-        HARDCODED_FRAMES.forEach(frame => {
+        // Filter legendary frames based on admin settings
+        const { settings: globalSettings } = useSettingsStore.getState();
+        const filteredFrames = HARDCODED_FRAMES.filter(frame => {
+          if (frame.id === 'frame-gaia' && !globalSettings?.gaiaFrameEnabled) return false;
+          if (frame.id === 'frame-supernova' && !globalSettings?.supernovaFrameEnabled) return false;
+          return true;
+        });
+        filteredFrames.forEach(frame => {
           if (!combined.find(r => r.id === frame.id)) {
             combined.push(frame);
           }

@@ -742,6 +742,34 @@ export default function Admin() {
                 />
               </div>
 
+              <hr style={{ border: 'none', borderTop: '1px solid var(--color-border)', margin: '8px 0' }} />
+              <h4 style={{ margin: 0, color: 'var(--color-text)', fontFamily: 'var(--font-display)', fontSize: 'var(--text-lg)' }}>🌿 Legendary Frame Visibility</h4>
+              <p style={{ margin: 0, color: 'var(--color-text-secondary)', fontSize: 'var(--text-sm)' }}>Toggle whether legendary frames appear in the Rewards shop for students.</p>
+
+              <div className={styles.inputGroup}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: 'var(--text-base)', color: 'var(--color-text)' }}>
+                  <input 
+                    type="checkbox" 
+                    checked={settingsData.gaiaFrameEnabled ?? false} 
+                    onChange={e => setSettingsData({...settingsData, gaiaFrameEnabled: e.target.checked})}
+                    style={{ width: '20px', height: '20px' }}
+                  />
+                  🌿 Enable Gaia Crown Frame (25,000 pts)
+                </label>
+              </div>
+
+              <div className={styles.inputGroup}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: 'var(--text-base)', color: 'var(--color-text)' }}>
+                  <input 
+                    type="checkbox" 
+                    checked={settingsData.supernovaFrameEnabled ?? false} 
+                    onChange={e => setSettingsData({...settingsData, supernovaFrameEnabled: e.target.checked})}
+                    style={{ width: '20px', height: '20px' }}
+                  />
+                  🌌 Enable Supernova Frame (50,000 pts)
+                </label>
+              </div>
+
               <div style={{ display: 'flex', justifyContent: 'flex-start', marginTop: '16px' }}>
                 <button type="submit" className={styles.approveBtn} style={{ width: 'auto', padding: '12px 24px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <PremiumIcon icon={Save} color="white" size={16} /> Save Global Settings
@@ -789,6 +817,8 @@ export default function Admin() {
                   onChange={(e) => setFrameModal({ ...frameModal, frameId: e.target.value })}
                   style={{ padding: '10px', background: 'var(--color-bg-card)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-sm)', color: 'var(--color-text)' }}
                 >
+                  <option value="frame-supernova">🌌 Supernova Frame (Legendary)</option>
+                  <option value="frame-gaia">🌿 Gaia Crown Frame (Legendary)</option>
                   <option value="frame-god">👑 God Frame (Ultimate Celestial)</option>
                   <option value="frame-platinum">💎 Platinum Frame</option>
                   <option value="frame-gold">🥇 Gold Frame</option>
