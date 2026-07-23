@@ -110,9 +110,9 @@ function PodiumSlot({ entry, index, tab }) {
         
         <div className={styles.podiumInfo}>
           <div className={styles.podiumMedal}>
-            {entry.rank === 1 ? <GoldMedal size={42} /> : 
-             entry.rank === 2 ? <SilverMedal size={32} /> : 
-             <BronzeMedal size={32} />}
+            {entry.rank === 1 ? <GoldMedal size={64} /> : 
+             entry.rank === 2 ? <SilverMedal size={52} /> : 
+             <BronzeMedal size={52} />}
           </div>
           <div className={styles.podiumName}>{displayName || 'EcoUser'}</div>
           <div className={styles.podiumPts}>
