@@ -57,6 +57,10 @@ export function Hero() {
             Sign In
             <ArrowUpRight className="h-4 w-4" />
           </Link>
+          <a href="/EcoSpark_Whitepaper.pdf" target="_blank" rel="noopener noreferrer" className="text-white text-sm font-medium flex items-center gap-2 hover:opacity-80 transition-opacity">
+            View Whitepaper
+            <ArrowUpRight className="h-4 w-4" />
+          </a>
         </motion.div>
 
         <motion.div
