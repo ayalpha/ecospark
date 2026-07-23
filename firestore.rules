@@ -21,8 +21,8 @@ service cloud.firestore {
     match /users/{userId} {
       allow read: if isAuthenticated();
       allow create: if isOwner(userId);
-      allow update: if isOwner(userId) || isTeacher();
-      allow delete: if false;
+      allow update: if isAuthenticated();
+      allow delete: if isOwner(userId);
     }
 
     // ── TASKS ───────────────
@@ -118,7 +118,14 @@ service cloud.firestore {
       allow update: if isAuthenticated() &&
         resource.data.userId == request.auth.uid &&
         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']);
-      allow create, delete: if false; // Server-side only
+      allow create: if isAuthenticated(); 
+      allow delete: if false; // Server-side only
+    }
+
+    // ── FOLLOWS ───────────────────────────────────────────────────────────
+    match /follows/{followId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated();
     }
 
     // ── SETTINGS ────────────────────────────────────────────────────────

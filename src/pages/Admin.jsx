@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useAuthStore } from '../store/authStore';
-import { getFlaggedSubmissions, updateSubmissionStatus, awardPointsAndUpdateStreak, resolveReport, getTasks, getRewards } from '../services/firestoreService';
+import { getFlaggedSubmissions, updateSubmissionStatus, awardPointsAndUpdateStreak, resolveReport, getTasks, getRewards, createNotification } from '../services/firestoreService';
 import { getAdminUsers, adminUpdateUserPoints, adminAwardFrame, adminBanUser, adminDeletePost, getReportedPosts, getAdminStats, getAdminChartData, getResolvedSubmissions, adminDeleteSubmission, adminCreateTask, adminUpdateTask, adminDeleteTask, adminCreateReward, adminUpdateReward, adminDeleteReward, getGlobalSettings, updateGlobalSettings, getFrameRequests, resolveFrameRequest } from '../services/adminService';
 import { sendPasswordResetEmail } from 'firebase/auth';
 import { auth } from '../lib/firebase';
@@ -111,6 +111,10 @@ export default function Admin() {
       if (status === 'approved' && !sub.pointsAwarded) {
         await awardPointsAndUpdateStreak(sub.userId, sub.taskId, sub.points || 50, {
           co2: sub.co2 || 0, water: sub.water || 0, waste: sub.waste || 0,
+        });
+        
+        await createNotification(sub.userId, 'system', {
+          message: `Your task verification was approved by an Admin! You've been credited ${sub.points || 50} points.`
         });
       }
 

@@ -1,13 +1,14 @@
 // src/pages/Home.jsx
-import { Suspense, lazy, useMemo } from 'react';
+import { Suspense, lazy, useMemo, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useAuthStore } from '../store/authStore';
 import { useUiStore } from '../store/uiStore';
+import { subscribeUserNotifications } from '../services/firestoreService';
 import NewsBoard from '../components/news/NewsBoard';
 import EcoHeroStatic from '../components/hero/EcoHeroStatic';
 import PremiumIcon from '../components/common/PremiumIcon';
-import { Camera, Trophy, Gift, Globe, Settings, Zap, Flame, CheckSquare, Leaf, Sparkles } from 'lucide-react';
+import { Camera, Trophy, Gift, Globe, Bell, Zap, Flame, CheckSquare, Leaf, Sparkles } from 'lucide-react';
 import styles from './Home.module.css';
 
 // Lazy-load 3D hero (code-split, never blocks initial paint)
@@ -139,6 +140,16 @@ export default function Home() {
     return <span className="flex items-center gap-1">{s} days — legend! <PremiumIcon icon={Trophy} color="gold" size={16} /></span>;
   }, [profile?.streak]);
 
+  const [unreadNotifs, setUnreadNotifs] = useState(0);
+
+  useEffect(() => {
+    if (!profile?.id) return;
+    const unsubNotifs = subscribeUserNotifications(profile.id, (notifs) => {
+      setUnreadNotifs(notifs.filter(n => !n.read).length);
+    });
+    return () => unsubNotifs();
+  }, [profile?.id]);
+
   return (
     <div className={styles.page}>
       {/* Welcome header */}
@@ -154,7 +165,20 @@ export default function Home() {
           </h1>
           <div className={styles.subgreeting}>{streakMsg}</div>
         </div>
-        <Link to="/settings" className={styles.settingsBtn} aria-label="Settings"><PremiumIcon icon={Settings} color="slate" size={24} /></Link>
+        <Link to="/notifications" className={styles.settingsBtn} aria-label="Notifications" style={{ position: 'relative' }}>
+          <PremiumIcon icon={Bell} color="gold" size={24} />
+          {unreadNotifs > 0 && (
+            <div style={{
+              position: 'absolute', top: -2, right: -2,
+              background: '#EF4444', color: '#FFF', fontSize: '10px',
+              fontWeight: 'bold', width: '18px', height: '18px',
+              borderRadius: '50%', display: 'flex', alignItems: 'center',
+              justifyContent: 'center', boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+            }}>
+              {unreadNotifs > 9 ? '9+' : unreadNotifs}
+            </div>
+          )}
+        </Link>
       </motion.div>
 
       {/* ══════════════════════════════════════════

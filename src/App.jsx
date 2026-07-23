@@ -22,6 +22,7 @@ const Profile = React.lazy(() => import('./pages/Profile'));
 const UserProfile = React.lazy(() => import('./pages/UserProfile'));
 const Messages = React.lazy(() => import('./pages/Messages'));
 const Settings = React.lazy(() => import('./pages/Settings'));
+const Notifications = React.lazy(() => import('./pages/Notifications'));
 const Admin = React.lazy(() => import('./pages/Admin'));
 const About = React.lazy(() => import('./pages/About'));
 const Landing = React.lazy(() => import('./pages/Landing'));
@@ -190,6 +191,7 @@ export default function App() {
                       <Route path="/user/:id" element={<UserProfile />} />
                       <Route path="/messages" element={<Messages />} />
                       <Route path="/messages/:chatId" element={<Messages />} />
+                      <Route path="/notifications" element={<Notifications />} />
                       <Route path="/settings" element={<Settings />} />
                       <Route path="/admin" element={<Admin />} />
                       <Route path="/about" element={<About />} />

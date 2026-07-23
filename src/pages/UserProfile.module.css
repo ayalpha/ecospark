@@ -115,10 +115,66 @@
   font-weight: var(--font-medium);
 }
 
-.actionSection {
-  margin-top: 20px;
+.socialCounts {
   display: flex;
   justify-content: center;
+  gap: 16px;
+  margin-top: 12px;
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
+.socialCounts span {
+  background: rgba(255, 255, 255, 0.03);
+  padding: 4px 12px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.socialCounts strong {
+  color: var(--color-text);
+}
+
+.actionSection {
+  margin-top: 24px;
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+}
+
+.followBtn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: white;
+  border: none;
+  border-radius: 24px;
+  padding: 12px 32px;
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  font-weight: var(--font-bold);
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(16, 185, 129, 0.4);
+  transition: all 0.2s;
+}
+
+.followBtn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(16, 185, 129, 0.6);
+}
+
+.followBtn.following {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: none;
+  color: var(--color-text);
+}
+
+.followBtn.following:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.1);
+  border-color: rgba(239, 68, 68, 0.4);
+  color: #ef4444;
 }
 
 .messageBtn {

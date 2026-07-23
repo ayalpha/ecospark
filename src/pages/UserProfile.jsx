@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import { useUser } from '../lib/useUser';
@@ -83,14 +83,16 @@ export default function UserProfile() {
 
           <div className={styles.actionSection}>
             {currentUser?.id !== profile.id && (
-              <button 
-                className={styles.messageBtn} 
-                onClick={handleMessage} 
-                disabled={messaging}
-              >
-                <MessageCircle size={18} />
-                {messaging ? 'Opening...' : 'Message'}
-              </button>
+              <>
+                <button 
+                  className={styles.messageBtn} 
+                  onClick={handleMessage} 
+                  disabled={messaging}
+                >
+                  <MessageCircle size={18} />
+                  {messaging ? 'Opening...' : 'Message'}
+                </button>
+              </>
             )}
           </div>
         </div>

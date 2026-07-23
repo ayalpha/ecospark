@@ -307,6 +307,8 @@ export async function getPublicProfile(userId) {
     badges: data.badges || [],
     unlockedFrames: data.unlockedFrames || [],
     activeFrame: data.activeFrame || null,
+    followersCount: data.followersCount || 0,
+    followingCount: data.followingCount || 0,
     createdAt: data.createdAt,
     lastActivityDate: data.lastActivityDate || null,
   };
@@ -529,6 +531,32 @@ export async function getGroup(groupId) {
 
 // ─── NOTIFICATIONS ────────────────────────────────────────────────────────────
 
+export async function createNotification(userId, type, payload) {
+  await addDoc(collection(db, 'notifications'), {
+    userId,
+    type, // 'follow', 'message', 'streak', 'system'
+    read: false,
+    payload,
+    createdAt: serverTimestamp(),
+  });
+}
+
+export function subscribeUserNotifications(userId, callback) {
+  const q = query(
+    collection(db, 'notifications'),
+    where('userId', '==', userId)
+  );
+  return onSnapshot(q, (snap) => {
+    let notifs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    notifs.sort((a, b) => {
+      const timeA = a.createdAt?.toMillis ? a.createdAt.toMillis() : Date.now();
+      const timeB = b.createdAt?.toMillis ? b.createdAt.toMillis() : Date.now();
+      return timeB - timeA;
+    });
+    callback(notifs.slice(0, 30));
+  });
+}
+
 export async function getUserNotifications(userId) {
   const snap = await getDocs(
     query(
@@ -551,7 +579,49 @@ export async function markNotificationRead(notifId) {
   await updateDoc(doc(db, 'notifications', notifId), { read: true });
 }
 
-// ─── REFERRALS ────────────────────────────────────────────────────────────────
+// ─── REFERRALS & FOLLOWS ──────────────────────────────────────────────────────
+
+export async function followUser(currentUserId, targetUserId, currentUserName) {
+  const followRef = doc(db, 'follows', `${currentUserId}_${targetUserId}`);
+  const snap = await getDoc(followRef);
+  if (snap.exists()) return; // Already following
+
+  await setDoc(followRef, {
+    followerId: currentUserId,
+    followingId: targetUserId,
+    createdAt: serverTimestamp(),
+  });
+
+  // Update counts
+  await updateDoc(doc(db, 'users', currentUserId), { followingCount: increment(1) });
+  await updateDoc(doc(db, 'users', targetUserId), { followersCount: increment(1) });
+
+  // Send notification
+  await createNotification(targetUserId, 'follow', {
+    followerId: currentUserId,
+    followerName: currentUserName,
+    message: 'started following you.'
+  });
+}
+
+export async function unfollowUser(currentUserId, targetUserId) {
+  const followRef = doc(db, 'follows', `${currentUserId}_${targetUserId}`);
+  const snap = await getDoc(followRef);
+  if (!snap.exists()) return; // Not following
+
+  await deleteDoc(followRef);
+
+  // Update counts
+  await updateDoc(doc(db, 'users', currentUserId), { followingCount: increment(-1) });
+  await updateDoc(doc(db, 'users', targetUserId), { followersCount: increment(-1) });
+}
+
+export async function checkFollowStatus(currentUserId, targetUserId) {
+  if (!currentUserId || !targetUserId) return false;
+  const followRef = doc(db, 'follows', `${currentUserId}_${targetUserId}`);
+  const snap = await getDoc(followRef);
+  return snap.exists();
+}
 
 export async function processReferral(newUserId, referralCode) {
   // Find referrer by code
@@ -675,12 +745,21 @@ export async function sendMessage(chatId, senderId, text, mediaUrl = null, media
   
   await setDoc(msgRef, payload);
   
-  // Find other participants to mark as unread
+  // Find other participants to mark as unread and notify
   const chatSnap = await getDoc(doc(db, 'chats', chatId));
   let unreadBy = [];
   if (chatSnap.exists()) {
     const participants = chatSnap.data().participants || [];
     unreadBy = participants.filter(p => p !== senderId);
+    
+    // Send notifications to receivers
+    for (const receiverId of unreadBy) {
+      createNotification(receiverId, 'message', {
+        chatId,
+        senderId,
+        message: 'sent you a new message.'
+      }).catch(console.error);
+    }
   }
   
   await updateDoc(doc(db, 'chats', chatId), {

@@ -28,11 +28,14 @@ export default function Sidebar() {
 
   useEffect(() => {
     if (!profile?.id) return;
-    const unsub = subscribeConversations(profile.id, (chats) => {
+    const unsubChats = subscribeConversations(profile.id, (chats) => {
       const unreadChats = chats.filter(c => c.unreadBy?.includes(profile.id));
       setUnreadCount(unreadChats.length);
     });
-    return () => unsub();
+    
+    return () => {
+      unsubChats();
+    };
   }, [profile?.id]);
 
   const handleLogout = async () => {

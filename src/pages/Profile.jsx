@@ -1,14 +1,14 @@
 // src/pages/Profile.jsx
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useAuthStore } from '../store/authStore';
 import { getWeeklyImpact, updateUserProfile } from '../services/firestoreService';
 import { compressImageToBase64 } from '../lib/imageUtils';
-import { useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import Avatar from '../components/common/Avatar';
 import styles from './Profile.module.css';
+import { Settings, Edit2, Image as ImageIcon, Camera } from 'lucide-react';
 
 function WeeklyImpactCard({ profile }) {
   const [impact, setImpact] = useState(null);
@@ -19,29 +19,29 @@ function WeeklyImpactCard({ profile }) {
   }, [profile?.id]);
 
   return (
-    <div className={styles.impactCard}>
-      <div className={styles.impactHeader}>
-        <h3 className={styles.impactTitle}>📊 Weekly Impact Report</h3>
-        <span className={styles.impactWeek}>This week</span>
+    <motion.div 
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.5, duration: 0.5 }}
+      className={styles.dashboardCard} 
+      style={{ marginTop: '0', padding: '32px' }}
+    >
+      <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', marginBottom: '24px' }}>
+        <h3 className={styles.badgesTitle}>📊 Weekly Impact</h3>
+        <span style={{ fontSize: '12px', background: 'rgba(255,255,255,0.1)', padding: '4px 12px', borderRadius: '100px', fontWeight: 'bold' }}>This week</span>
       </div>
-      <div className={styles.impactStats}>
-        <div className={styles.impactStat}>
-          <span className={styles.impactVal}>{impact?.count ?? '–'}</span>
-          <span className={styles.impactLabel}>Tasks</span>
+      <div className={styles.hologramStats} style={{ marginTop: '0' }}>
+        <div className={styles.holoBox}>
+          <span className={styles.holoVal}>{profile?.weeklyPoints ?? 0}</span>
+          <span className={styles.holoLabel}>Points</span>
         </div>
-        <div className={styles.impactDivider} />
-        <div className={styles.impactStat}>
-          <span className={styles.impactVal}>{profile?.weeklyPoints ?? 0}</span>
-          <span className={styles.impactLabel}>Points</span>
-        </div>
-        <div className={styles.impactDivider} />
-        <div className={styles.impactStat}>
-          <span className={styles.impactVal}>{impact?.co2 ? `${impact.co2}g` : '–'}</span>
-          <span className={styles.impactLabel}>CO₂ saved</span>
+        <div className={styles.holoBox}>
+          <span className={styles.holoVal}>{impact?.co2 ? `${impact.co2}g` : '–'}</span>
+          <span className={styles.holoLabel}>CO₂ saved</span>
         </div>
       </div>
-      <p className={styles.impactShare}>📸 Screenshot to share your weekly impact!</p>
-    </div>
+      <p style={{ marginTop: '24px', fontSize: '12px', color: '#94a3b8', fontStyle: 'italic' }}>📸 Screenshot to share your weekly impact!</p>
+    </motion.div>
   );
 }
 
@@ -68,32 +68,55 @@ function ReferralCard({ profile }) {
   };
 
   return (
-    <div className={styles.referralCard}>
-      <h3 className={styles.referralTitle}>🤝 Invite a Classmate</h3>
-      <p className={styles.referralDesc}>
-        Earn <strong>50 bonus points</strong> when a friend joins and completes their first task.
+    <motion.div 
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.6, duration: 0.5 }}
+      className={styles.dashboardCard} 
+      style={{ marginTop: '0', padding: '32px' }}
+    >
+      <h3 className={styles.badgesTitle}>🤝 Invite a Classmate</h3>
+      <p style={{ color: '#cbd5e1', marginBottom: '24px', fontSize: '16px' }}>
+        Earn <strong style={{ color: '#4ADE80' }}>50 bonus points</strong> when a friend joins and completes their first task.
       </p>
-      <div className={styles.referralCode}>{profile?.referralCode}</div>
-      <p className={styles.referralCount}>{profile?.referralCount || 0} friends invited</p>
+      
+      <div style={{ background: 'rgba(0,0,0,0.4)', border: '1px dashed rgba(255,255,255,0.2)', padding: '20px', borderRadius: '16px', marginBottom: '16px', width: '100%', textAlign: 'center' }}>
+        <span style={{ fontFamily: 'monospace', fontSize: '28px', fontWeight: '900', letterSpacing: '0.2em', color: '#4ADE80' }}>
+          {profile?.referralCode}
+        </span>
+      </div>
+      
+      <p style={{ color: '#94a3b8', fontSize: '14px', marginBottom: '24px', fontWeight: 'bold' }}>
+        {profile?.referralCount || 0} friends invited
+      </p>
+      
       <motion.button
-        className={styles.shareBtn}
+        className={styles.saveBtn}
         onClick={share}
-        whileTap={{ scale: 0.96 }}
+        whileTap={{ scale: 0.95 }}
+        style={{ width: '100%', padding: '16px', fontSize: '18px' }}
       >
         {copied ? '✅ Copied!' : '📤 Share Invite Link'}
       </motion.button>
-    </div>
+    </motion.div>
   );
 }
 
 export default function Profile() {
   const { user, profile } = useAuthStore();
   const [editing, setEditing] = useState(false);
-  const [name, setName] = useState(profile?.displayName || '');
-  const [bio, setBio] = useState(profile?.bio || '');
+  const [name, setName] = useState('');
+  const [bio, setBio] = useState('');
   const [saving, setSaving] = useState(false);
   const fileInputRef = useRef(null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
+
+  useEffect(() => {
+    if (!editing && profile) {
+      setName(profile.displayName || '');
+      setBio(profile.bio || '');
+    }
+  }, [profile, editing]);
 
   const handlePhotoUpload = async (e) => {
     const file = e.target.files?.[0];
@@ -134,111 +157,158 @@ export default function Profile() {
     }
   };
 
-  useEffect(() => {
-    if (!editing && profile) {
-      setName(profile.displayName || '');
-      setBio(profile.bio || '');
-    }
-  }, [profile, editing]);
+  if (!profile) return null;
 
   return (
     <div className={styles.page}>
-      <h1 className={styles.title}>Profile</h1>
+      
+      {/* Epic Hero Background */}
+      <div className={styles.heroBanner} />
+      
+      {/* Top Bar */}
+      <div className={styles.topControls}>
+        <Link to="/settings" className={styles.settingsLink}>
+          <Settings size={18} /> Settings
+        </Link>
+      </div>
 
-      {/* Avatar + name */}
-      <div className={styles.profileCard}>
-        <div className={styles.avatarWrapper}>
-          <div className={styles.avatar} onClick={() => !uploadingPhoto && fileInputRef.current?.click()}>
+      {/* Main Dashboard Card */}
+      <motion.div 
+        initial={{ opacity: 0, y: 40, scale: 0.95 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{ duration: 0.6, cubicBezier: [0.16, 1, 0.3, 1] }}
+        className={styles.dashboardCard}
+      >
+        {/* Floating Avatar Showcase */}
+        <div className={styles.avatarShowcase}>
+          <div className={styles.avatarOrbit} />
+          <div className={styles.avatarContainer} onClick={() => !uploadingPhoto && fileInputRef.current?.click()}>
             {uploadingPhoto ? (
-              <span className={styles.spinner}>⏳</span>
+              <span className={styles.spinner} style={{ fontSize: '32px', margin: '32px' }}>⏳</span>
             ) : (
               <Avatar
                 src={profile?.photoURL}
                 activeFrame={profile?.activeFrame}
-                size={96}
+                size={100}
                 alt={profile?.displayName}
               />
             )}
             <div className={styles.avatarOverlay}>
-              <span>📷</span>
+              <Camera size={32} color="white" />
             </div>
+            <div className={styles.levelBadge}>{profile?.streak || 0}🔥</div>
           </div>
-          <input
-            type="file"
-            accept="image/*"
-            ref={fileInputRef}
-            style={{ display: 'none' }}
-            onChange={handlePhotoUpload}
-          />
+          <input type="file" accept="image/*" ref={fileInputRef} style={{ display: 'none' }} onChange={handlePhotoUpload} />
         </div>
+
+        {/* Identity & Editing */}
         {editing ? (
-          <div className={styles.editName}>
+          <div className={styles.editContainer}>
             <input
-              className={styles.nameInput}
+              className={styles.glassInput}
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Display Name"
               autoFocus
             />
             <textarea
-              className={styles.nameInput}
+              className={styles.glassInput}
               value={bio}
               onChange={(e) => setBio(e.target.value)}
               placeholder="Write a short bio..."
               rows={2}
               maxLength={100}
-              style={{ marginTop: '8px', resize: 'none', height: '60px' }}
+              style={{ resize: 'none' }}
             />
-            <div className={styles.editActions}>
+            <div className={styles.editControls}>
               <button className={styles.saveBtn} onClick={handleSave} disabled={saving}>
-                {saving ? '...' : 'Save'}
+                {saving ? 'Saving...' : 'Save Profile'}
               </button>
               <button className={styles.cancelBtn} onClick={() => setEditing(false)}>Cancel</button>
             </div>
           </div>
         ) : (
-          <>
-            <h2 className={styles.profileName}>{profile?.displayName || 'EcoUser'}</h2>
-            <p className={styles.profileBio} style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--text-sm)', textAlign: 'center', marginTop: '4px', maxWidth: '300px' }}>
+          <div className={styles.identity}>
+            <h1 className={styles.profileName}>{profile?.displayName || 'EcoUser'}</h1>
+            <p className={styles.profileBio}>
               {profile?.bio || (profile?.role === 'admin' ? '✨ Platform Admin' : 'Sustainability Advocate')}
             </p>
             <p className={styles.profileEmail}>{user?.email}</p>
-            <button className={styles.editBtn} onClick={() => setEditing(true)}>✏️ Edit Profile</button>
-          </>
+            <button className={styles.editBtn} onClick={() => setEditing(true)}>
+              <Edit2 size={14} style={{ display: 'inline', marginRight: '6px' }} /> Edit Profile
+            </button>
+          </div>
         )}
-      </div>
 
-      {/* Stats */}
-      <div className={styles.statsGrid}>
+        {/* Holographic Top Stats */}
+        {!editing && (
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2, duration: 0.5 }}
+            className={styles.hologramStats}
+          >
+            <div className={styles.holoBox}>
+              <span className={styles.holoVal}>{(profile?.lifetimePoints || profile?.points || 0).toLocaleString()}</span>
+              <span className={styles.holoLabel}>Lifetime Pts</span>
+            </div>
+            <div className={styles.holoBox}>
+              <span className={styles.holoVal}>{profile?.totalTasksCompleted || 0}</span>
+              <span className={styles.holoLabel}>Tasks Done</span>
+            </div>
+            <div className={styles.holoBox}>
+              <span className={styles.holoVal}>{profile?.badges?.length || 0}</span>
+              <span className={styles.holoLabel}>Badges</span>
+            </div>
+          </motion.div>
+        )}
+      </motion.div>
+
+      {/* Advanced Stats Grid */}
+      <motion.div 
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.3, duration: 0.5 }}
+        className={styles.advancedGrid}
+      >
         {[
           { icon: '⚡', val: (profile?.spendableBalance ?? profile?.points ?? 0).toLocaleString(), label: 'Points' },
           { icon: '🔥', val: profile?.streak || 0, label: 'Current Streak' },
           { icon: '🏆', val: profile?.longestStreak || 0, label: 'Longest Streak' },
-          { icon: '✅', val: profile?.totalTasksCompleted || 0, label: 'Tasks Completed' },
+          { icon: '✅', val: profile?.totalTasksCompleted || 0, label: 'Completed' },
           { icon: '🌿', val: `${((profile?.totalCO2Saved || 0) / 1000).toFixed(1)}kg`, label: 'CO₂ Saved' },
           { icon: '💧', val: `${profile?.totalWaterSaved || 0}L`, label: 'Water Saved' },
-        ].map((s) => (
-          <div key={s.label} className={styles.statItem}>
-            <span className={styles.statIcon}>{s.icon}</span>
-            <span className={styles.statVal}>{s.val}</span>
-            <span className={styles.statLabel}>{s.label}</span>
-          </div>
+        ].map((s, i) => (
+          <motion.div 
+            key={s.label} 
+            className={styles.gridCard}
+            whileHover={{ y: -5, scale: 1.02 }}
+          >
+            <span className={styles.gridIcon}>{s.icon}</span>
+            <span className={styles.gridVal}>{s.val}</span>
+            <span className={styles.gridLabel}>{s.label}</span>
+          </motion.div>
         ))}
-      </div>
+      </motion.div>
 
-      {/* Badges */}
+      {/* Badges Showcase */}
       {profile?.badges?.length > 0 && (
-        <div className={styles.badgesSection}>
-          <h3 className={styles.sectionTitle}>🏅 Badges Earned</h3>
-          <div className={styles.badges}>
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.4, duration: 0.5 }}
+          className={styles.badgesShowcase}
+        >
+          <h3 className={styles.badgesTitle}>🏅 Badges Earned</h3>
+          <div className={styles.badgesGrid}>
             {profile.badges.map((b) => (
-              <div key={b} className={styles.badge}>
+              <div key={b} className={styles.premiumBadge}>
                 <span className={styles.badgeIcon}>🏅</span>
                 <span className={styles.badgeLabel}>{b}</span>
               </div>
             ))}
           </div>
-        </div>
+        </motion.div>
       )}
 
       {/* Weekly impact */}
@@ -247,10 +317,6 @@ export default function Profile() {
       {/* Referral */}
       <ReferralCard profile={profile} />
 
-      {/* Settings link */}
-      <Link to="/settings" className={styles.settingsLink}>
-        ⚙️ Accessibility & Theme Settings →
-      </Link>
     </div>
   );
 }
