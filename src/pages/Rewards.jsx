@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuthStore } from '../store/authStore';
 import { getRewards, redeemReward, equipFrame, unequipFrame, subscribeUserTransactions } from '../services/firestoreService';
-import { BronzeFrame, SilverFrame, GoldFrame, PlatinumFrame, GodFrame, GaiaFrame, SupernovaFrame } from '../components/common/Frames';
+import { BronzeFrame, SilverFrame, GoldFrame, PlatinumFrame, GodFrame, GaiaFrame, SupernovaFrame, PrimeFrame } from '../components/common/Frames';
 import toast from 'react-hot-toast';
 import { useSettingsStore } from '../store/settingsStore';
 import styles from './Rewards.module.css';
@@ -16,6 +16,7 @@ const FRAME_COMPONENTS = {
   'frame-god': GodFrame,
   'frame-gaia': GaiaFrame,
   'frame-supernova': SupernovaFrame,
+  'frame-prime': PrimeFrame,
 };
 
 const TIER_CONFIG = {
@@ -26,6 +27,7 @@ const TIER_CONFIG = {
   god: { color: '#FACC15', glow: '0 0 30px rgba(250,204,21,0.8)', label: 'God' },
   gaia: { color: '#10B981', glow: '0 0 35px rgba(16,185,129,0.6)', label: 'Legendary' },
   supernova: { color: '#8B5CF6', glow: '0 0 40px rgba(139,92,246,0.7)', label: 'Legendary' },
+  prime: { color: '#FFD700', glow: '0 0 50px rgba(255,215,0,1)', label: 'Prime' },
 };
 
 const HARDCODED_FRAMES = [
@@ -36,6 +38,7 @@ const HARDCODED_FRAMES = [
   { id: 'frame-god', name: 'Supreme God Frame', description: 'The ultimate celestial frame.', pointCost: 10000, tier: 'god', icon: '👑' },
   { id: 'frame-gaia', name: 'Gaia Crown', description: 'Earth\'s Guardian — a legendary emerald aura with golden shimmer. Only the most dedicated eco-warriors wield this.', pointCost: 25000, tier: 'gaia', icon: '🌿' },
   { id: 'frame-supernova', name: 'Supernova', description: 'Cosmic Energy — a legendary deep-space frame with rotating neon gradients and orbiting energy orbs. The rarest frame in existence.', pointCost: 50000, tier: 'supernova', icon: '🌌' },
+  { id: 'frame-prime', name: 'Prime Frame', description: 'The Ascended Aura — the ultimate, reality-bending celestial frame. Reserved only for the most elite eco-gods.', pointCost: 999999, tier: 'prime', icon: '✨' },
 ];
 
 function ConfettiParticle({ delay }) {
@@ -135,6 +138,7 @@ function RewardCard({ reward, userPoints, owned, onRedeem, onEquip, onUnequip, i
 
 export default function Rewards() {
   const { user, profile } = useAuthStore();
+  const { settings } = useSettingsStore();
   const [rewards, setRewards] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -162,10 +166,16 @@ export default function Rewards() {
       .then((fetched) => {
         const combined = [...fetched];
         // Filter legendary frames based on admin settings
-        const { settings: globalSettings } = useSettingsStore.getState();
         const filteredFrames = HARDCODED_FRAMES.filter(frame => {
-          if (frame.id === 'frame-gaia' && !globalSettings?.gaiaFrameEnabled) return false;
-          if (frame.id === 'frame-supernova' && !globalSettings?.supernovaFrameEnabled) return false;
+          // If the user ALREADY OWNS the frame, ALWAYS show it so they can equip it!
+          const ownsFrame = profile?.unlockedFrames?.includes(frame.id);
+          if (ownsFrame) return true;
+
+          // Otherwise, hide admin-exclusive frames, or frames disabled in global settings
+          if (frame.id === 'frame-prime') return false; 
+          if (frame.id === 'frame-gaia' && !settings?.gaiaFrameEnabled) return false;
+          if (frame.id === 'frame-supernova' && !settings?.supernovaFrameEnabled) return false;
+          
           return true;
         });
         filteredFrames.forEach(frame => {
@@ -186,7 +196,7 @@ export default function Rewards() {
 
   useEffect(() => {
     loadRewards();
-  }, []);
+  }, [profile?.unlockedFrames?.length, settings?.gaiaFrameEnabled, settings?.supernovaFrameEnabled]);
 
   const handleEquip = async (frameId) => {
     if (!user) return;
