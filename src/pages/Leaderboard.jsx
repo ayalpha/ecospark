@@ -107,19 +107,22 @@ function PodiumSlot({ entry, index, tab }) {
             alt={displayName} 
           />
         </div>
-        <div className={styles.podiumName}>{displayName || 'EcoUser'}</div>
-        <div className={styles.podiumPts}>
-          {tab === 'streak'
-            ? <span style={{display:'flex', alignItems:'center', gap:'4px', justifyContent:'center'}}><PremiumIcon icon={Flame} color="ruby" size={14} /> {streak || 0} Days</span>
-            : `${(weeklyPoints || 0).toLocaleString()} pts`}
-        </div>
-        <div className={styles.podiumBar} style={{ height: index === 1 ? 80 : 60, overflow: 'visible' }}>
-          <div style={{ marginTop: '-40px' }}>
-            {entry.rank === 1 ? <GoldMedal size={48} /> : 
-             entry.rank === 2 ? <SilverMedal size={40} /> : 
-             <BronzeMedal size={40} />}
+        
+        <div className={styles.podiumInfo}>
+          <div className={styles.podiumMedal}>
+            {entry.rank === 1 ? <GoldMedal size={42} /> : 
+             entry.rank === 2 ? <SilverMedal size={32} /> : 
+             <BronzeMedal size={32} />}
+          </div>
+          <div className={styles.podiumName}>{displayName || 'EcoUser'}</div>
+          <div className={styles.podiumPts}>
+            {tab === 'streak'
+              ? <span style={{display:'flex', alignItems:'center', gap:'4px', justifyContent:'center'}}><PremiumIcon icon={Flame} color="ruby" size={14} /> {streak || 0} Days</span>
+              : `${(weeklyPoints || 0).toLocaleString()} pts`}
           </div>
         </div>
+        
+        <div className={styles.podiumBar} style={{ height: index === 1 ? 140 : 100 }}></div>
       </motion.div>
     </Link>
   );
