@@ -59,11 +59,12 @@ export async function updateUserProfile(uid, updates) {
     ...updates,
     updatedAt: serverTimestamp(),
   });
-  // Sync displayName and photoURL to leaderboard doc if changed
-  if (updates.displayName || updates.photoURL !== undefined) {
+  // Sync displayName, photoURL, and privacy setting to leaderboard doc if changed
+  if (updates.displayName || updates.photoURL !== undefined || updates.showOnLeaderboard !== undefined) {
     const lbUpdates = { updatedAt: serverTimestamp() };
     if (updates.displayName) lbUpdates.displayName = updates.displayName;
     if (updates.photoURL !== undefined) lbUpdates.photoURL = updates.photoURL;
+    if (updates.showOnLeaderboard !== undefined) lbUpdates.showOnLeaderboard = updates.showOnLeaderboard;
     try {
       await updateDoc(doc(db, 'leaderboard', uid), lbUpdates);
     } catch { /* leaderboard doc may not exist yet */ }
@@ -235,6 +236,7 @@ export async function awardPointsAndUpdateStreak(userId, taskId, points, impact 
       userId,
       displayName: user.displayName,
       photoURL: user.photoURL || null,
+      showOnLeaderboard: user.showOnLeaderboard ?? true,
       points: increment(points),
       weeklyPoints: increment(points),
       streak: newStreak,
@@ -270,14 +272,18 @@ export async function getLeaderboard(type = 'global', groupId = null, limitCount
     );
   }
   const snap = await getDocs(q);
-  return snap.docs.map((d, i) => ({ rank: i + 1, id: d.id, ...d.data() }));
+  let results = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  results = results.filter(u => u.showOnLeaderboard !== false);
+  return results.map((u, i) => ({ rank: i + 1, ...u }));
 }
 
 export function subscribeLeaderboard(type = 'weekly', groupId = null, callback, onError) {
   let sortField = type === 'streak' ? 'streak' : 'weeklyPoints';
   let q = query(collection(db, 'leaderboard'), orderBy(sortField, 'desc'), limit(50));
   return onSnapshot(q, (snap) => {
-    callback(snap.docs.map((d, i) => ({ rank: i + 1, id: d.id, ...d.data() })));
+    let users = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    users = users.filter(u => u.showOnLeaderboard !== false);
+    callback(users.map((u, i) => ({ rank: i + 1, ...u })));
   }, onError);
 }
 
@@ -302,6 +308,7 @@ export async function getPublicProfile(userId) {
     unlockedFrames: data.unlockedFrames || [],
     activeFrame: data.activeFrame || null,
     createdAt: data.createdAt,
+    lastActivityDate: data.lastActivityDate || null,
   };
 }
 
@@ -621,6 +628,7 @@ export async function createOrGetChat(userAId, userBId) {
   await setDoc(ref, {
     participants: [userAId, userBId],
     lastMessage: null,
+    unreadBy: [],
     updatedAt: serverTimestamp(),
   });
   return ref.id;
@@ -667,10 +675,30 @@ export async function sendMessage(chatId, senderId, text, mediaUrl = null, media
   
   await setDoc(msgRef, payload);
   
+  // Find other participants to mark as unread
+  const chatSnap = await getDoc(doc(db, 'chats', chatId));
+  let unreadBy = [];
+  if (chatSnap.exists()) {
+    const participants = chatSnap.data().participants || [];
+    unreadBy = participants.filter(p => p !== senderId);
+  }
+  
   await updateDoc(doc(db, 'chats', chatId), {
     lastMessage: text || (mediaType === 'video' ? 'Sent a video' : 'Sent an image'),
+    unreadBy,
     updatedAt: serverTimestamp(),
   });
+}
+
+export async function markChatAsRead(chatId, userId) {
+  const chatRef = doc(db, 'chats', chatId);
+  try {
+    await updateDoc(chatRef, {
+      unreadBy: arrayRemove(userId)
+    });
+  } catch (err) {
+    console.error('Failed to mark chat as read:', err);
+  }
 }
 
 // ─── TRANSACTIONS ─────────────────────────────────────────────────────────────

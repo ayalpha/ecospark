@@ -4,6 +4,9 @@ import { motion } from 'framer-motion';
 import { useUiStore } from '../store/uiStore';
 import { useAuthStore } from '../store/authStore';
 import { updateUserProfile } from '../services/firestoreService';
+import { auth, db } from '../lib/firebase';
+import { sendPasswordResetEmail, verifyBeforeUpdateEmail, deleteUser } from 'firebase/auth';
+import { doc, getDoc, deleteDoc } from 'firebase/firestore';
 import toast from 'react-hot-toast';
 import styles from './Settings.module.css';
 
@@ -76,7 +79,76 @@ export default function Settings() {
     }
   };
 
-  const handleAction = (actionName) => {
+  const handleAction = async (actionName) => {
+    if (actionName === 'Change Password') {
+      try {
+        await sendPasswordResetEmail(auth, user.email);
+        toast.success(`Password reset email sent to ${user.email}`);
+      } catch (err) {
+        toast.error('Failed to send reset email: ' + err.message);
+      }
+      return;
+    }
+
+    if (actionName === 'Change Email') {
+      const newEmail = prompt('Enter your new email address:');
+      if (!newEmail || newEmail.trim() === '') return;
+      try {
+        await verifyBeforeUpdateEmail(auth.currentUser, newEmail.trim());
+        toast.success(`Verification link sent to ${newEmail}`);
+      } catch (err) {
+        if (err.code === 'auth/requires-recent-login') {
+          toast.error('Please log out and log back in to change your email.');
+        } else {
+          toast.error('Failed to update email: ' + err.message);
+        }
+      }
+      return;
+    }
+
+    if (actionName === 'Export Data') {
+      try {
+        const userDoc = await getDoc(doc(db, 'users', user.uid));
+        if (userDoc.exists()) {
+          const data = userDoc.data();
+          const jsonString = JSON.stringify(data, null, 2);
+          const blob = new Blob([jsonString], { type: 'application/json' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `ecospark_data_${user.uid}.json`;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+          toast.success('Data exported successfully!');
+        } else {
+          toast.error('No data found to export.');
+        }
+      } catch (err) {
+        toast.error('Failed to export data: ' + err.message);
+      }
+      return;
+    }
+
+    if (actionName === 'Delete Account') {
+      const confirmDelete = window.confirm("Are you absolutely sure you want to delete your account? This action cannot be undone and all your points and data will be lost forever.");
+      if (!confirmDelete) return;
+      
+      try {
+        await deleteDoc(doc(db, 'users', user.uid));
+        await deleteUser(auth.currentUser);
+        toast.success('Account deleted permanently.');
+      } catch (err) {
+        if (err.code === 'auth/requires-recent-login') {
+          toast.error('For security reasons, please log out and log back in before deleting your account.');
+        } else {
+          toast.error('Failed to delete account: ' + err.message);
+        }
+      }
+      return;
+    }
+
     toast('This feature is coming soon!', { icon: '🚧' });
   };
 
@@ -179,6 +251,13 @@ export default function Settings() {
             style={{ background: 'var(--color-surface)', color: 'var(--color-text)', border: '1px solid var(--color-border)', padding: '12px', borderRadius: 'var(--radius-md)', textAlign: 'left', fontWeight: '500', cursor: 'pointer' }}
           >
             🔑 Change Password
+          </button>
+          <button 
+            className={styles.actionBtn} 
+            onClick={() => handleAction('Change Email')}
+            style={{ background: 'var(--color-surface)', color: 'var(--color-text)', border: '1px solid var(--color-border)', padding: '12px', borderRadius: 'var(--radius-md)', textAlign: 'left', fontWeight: '500', cursor: 'pointer' }}
+          >
+            ✉️ Change Email
           </button>
           <button 
             className={styles.actionBtn} 

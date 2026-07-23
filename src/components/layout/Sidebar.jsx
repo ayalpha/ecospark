@@ -4,6 +4,8 @@ import { motion } from 'framer-motion';
 import { signOut } from 'firebase/auth';
 import { auth } from '../../lib/firebase';
 import { useAuthStore } from '../../store/authStore';
+import { subscribeConversations } from '../../services/firestoreService';
+import { useEffect, useState } from 'react';
 import { Home, CheckSquare, Trophy, Gift, Globe, MessageCircle, Info, ShieldAlert, Zap, LogOut } from 'lucide-react';
 import PremiumIcon from '../common/PremiumIcon';
 import Avatar from '../common/Avatar';
@@ -22,6 +24,16 @@ const NAV_ITEMS = [
 export default function Sidebar() {
   const { user, profile } = useAuthStore();
   const navigate = useNavigate();
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    if (!profile?.id) return;
+    const unsub = subscribeConversations(profile.id, (chats) => {
+      const unreadChats = chats.filter(c => c.unreadBy?.includes(profile.id));
+      setUnreadCount(unreadChats.length);
+    });
+    return () => unsub();
+  }, [profile?.id]);
 
   const handleLogout = async () => {
     await signOut(auth);
@@ -50,7 +62,20 @@ export default function Sidebar() {
             >
               {({ isActive }) => (
                 <>
-                  <span className={styles.navIcon}>{item.icon}</span>
+                  <div style={{ position: 'relative' }}>
+                    <span className={styles.navIcon}>{item.icon}</span>
+                    {item.path === '/messages' && unreadCount > 0 && (
+                      <div style={{
+                        position: 'absolute', top: -4, right: -4,
+                        background: '#EF4444', color: '#FFF', fontSize: '10px',
+                        fontWeight: 'bold', width: '18px', height: '18px',
+                        borderRadius: '50%', display: 'flex', alignItems: 'center',
+                        justifyContent: 'center', boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+                      }}>
+                        {unreadCount > 9 ? '9+' : unreadCount}
+                      </div>
+                    )}
+                  </div>
                   <span className={styles.navLabel}>{item.label}</span>
                   {isActive && (
                     <motion.div

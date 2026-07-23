@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
-import { subscribeConversations, subscribeMessages, sendMessage, getPublicProfile } from '../services/firestoreService';
+import { subscribeConversations, subscribeMessages, sendMessage, getPublicProfile, markChatAsRead } from '../services/firestoreService';
 import { convertFileToBase64 } from '../lib/fileUtils';
 import Avatar from '../components/common/Avatar';
 import { Send, ArrowLeft, Paperclip, X } from 'lucide-react';
@@ -59,8 +59,15 @@ export default function Messages() {
     const unsub = subscribeMessages(chatId, (msgs) => {
       setMessages(msgs);
     });
+
+    // Mark chat as read if unread by me
+    const activeChat = conversations.find(c => c.id === chatId);
+    if (activeChat && activeChat.unreadBy?.includes(profile?.id)) {
+      markChatAsRead(chatId, profile.id);
+    }
+
     return () => unsub();
-  }, [chatId]);
+  }, [chatId, conversations, profile?.id]);
 
   // Scroll to bottom on new message
   useEffect(() => {
@@ -132,20 +139,51 @@ export default function Messages() {
           {conversations.length === 0 ? (
             <div className={styles.emptyState}>No messages yet</div>
           ) : (
-            conversations.map(chat => {
+            [...conversations]
+              .sort((a, b) => {
+                const aUnread = a.unreadBy?.includes(profile?.id) ? 1 : 0;
+                const bUnread = b.unreadBy?.includes(profile?.id) ? 1 : 0;
+                if (aUnread !== bUnread) return bUnread - aUnread; // unread first
+                const timeA = a.updatedAt?.toMillis ? a.updatedAt.toMillis() : 0;
+                const timeB = b.updatedAt?.toMillis ? b.updatedAt.toMillis() : 0;
+                return timeB - timeA;
+              })
+              .map(chat => {
               const oId = chat.participants.find(p => p !== profile?.id);
               const oProf = profilesCache[oId];
+              const isUnread = chat.unreadBy?.includes(profile?.id);
+              const isOnline = oProf?.lastActivityDate && (Date.now() - oProf.lastActivityDate.toMillis() < 5 * 60 * 1000);
               return (
                 <div 
                   key={chat.id} 
-                  className={`${styles.convItem} ${chatId === chat.id ? styles.active : ''}`}
+                  className={`${styles.convItem} ${chatId === chat.id ? styles.active : ''} ${isUnread ? styles.unreadChat : ''}`}
+                  style={{ position: 'relative', borderLeft: isUnread ? '4px solid var(--color-primary)' : '4px solid transparent' }}
                   onClick={() => navigate(`/messages/${chat.id}`)}
                 >
-                  <Avatar src={oProf?.photoURL} activeFrame={oProf?.activeFrame} size={48} />
-                  <div className={styles.convInfo}>
-                    <h4>{oProf?.displayName || 'User'}</h4>
-                    <p>{chat.lastMessage || 'New Conversation'}</p>
+                  <div style={{ position: 'relative' }}>
+                    <Avatar src={oProf?.photoURL} activeFrame={oProf?.activeFrame} size={48} />
+                    {isOnline && (
+                      <div style={{
+                        position: 'absolute', bottom: 0, right: 0,
+                        width: 14, height: 14, background: '#10B981', border: '2px solid var(--color-surface)',
+                        borderRadius: '50%', zIndex: 2
+                      }} title="Online" />
+                    )}
                   </div>
+                  <div className={styles.convInfo}>
+                    <h4 style={{ fontWeight: isUnread ? 'bold' : 'normal', color: isUnread ? 'var(--color-text)' : 'inherit' }}>
+                      {oProf?.displayName || 'User'}
+                    </h4>
+                    <p style={{ fontWeight: isUnread ? '600' : 'normal', color: isUnread ? 'var(--color-primary)' : 'inherit' }}>
+                      {chat.lastMessage || 'New Conversation'}
+                    </p>
+                  </div>
+                  {isUnread && (
+                    <div style={{
+                      width: 10, height: 10, background: 'var(--color-primary)',
+                      borderRadius: '50%', flexShrink: 0, alignSelf: 'center', marginLeft: 'auto'
+                    }} />
+                  )}
                 </div>
               );
             })

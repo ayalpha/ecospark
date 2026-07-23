@@ -1,26 +1,28 @@
 .container {
   display: flex;
-  height: calc(100vh - 40px); /* rough estimate assuming some padding */
+  height: calc(100vh - 40px);
   max-height: 800px;
-  background: var(--color-bg-card);
-  border: 1px solid var(--color-border);
-  border-radius: var(--card-radius-lg);
+  background: rgba(15, 15, 20, 0.6);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 24px;
   overflow: hidden;
-  box-shadow: var(--elevation-2);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.1);
   margin: 20px 0;
 }
 
 .sidebar {
   width: 350px;
-  border-right: 1px solid var(--color-border);
+  border-right: 1px solid rgba(255, 255, 255, 0.05);
   display: flex;
   flex-direction: column;
-  background: var(--color-bg);
+  background: rgba(0, 0, 0, 0.2);
 }
 
 .sidebarHeader {
   padding: 24px;
-  border-bottom: 1px solid var(--color-border);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 .sidebarHeader h2 {
@@ -37,18 +39,19 @@
 .convItem {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 16px;
   padding: 16px 24px;
   cursor: pointer;
-  transition: background 0.2s;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.02);
 }
 
 .convItem:hover {
-  background: rgba(255, 255, 255, 0.03);
+  background: rgba(255, 255, 255, 0.04);
 }
 
 .convItem.active {
-  background: rgba(255, 255, 255, 0.08);
+  background: linear-gradient(90deg, rgba(16, 185, 129, 0.15) 0%, transparent 100%);
 }
 
 .convInfo {
@@ -77,12 +80,13 @@
   flex: 1;
   display: flex;
   flex-direction: column;
-  background: var(--color-bg-card);
+  background: transparent;
 }
 
 .chatHeader {
   padding: 16px 24px;
-  border-bottom: 1px solid var(--color-border);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.02);
   display: flex;
   align-items: center;
   gap: 12px;
@@ -127,22 +131,27 @@
 }
 
 .messageBubble {
-  padding: 12px 16px;
+  padding: 14px 18px;
   border-radius: 20px;
   font-size: var(--text-sm);
-  line-height: 1.4;
+  line-height: 1.5;
   word-break: break-word;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
 }
 
 .sent .messageBubble {
-  background: var(--color-primary);
+  background: linear-gradient(135deg, var(--color-primary), #8B5CF6);
   color: white;
   border-bottom-right-radius: 4px;
+  box-shadow: 0 4px 15px rgba(16, 185, 129, 0.2), 0 0 20px rgba(139, 92, 246, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .received .messageBubble {
-  background: var(--color-bg);
-  border: 1px solid var(--color-border);
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   color: var(--color-text);
   border-bottom-left-radius: 4px;
 }
@@ -171,8 +180,8 @@
 .inputArea {
   display: flex;
   flex-direction: column;
-  border-top: 1px solid var(--color-border);
-  background: var(--color-bg-card);
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  background: rgba(0, 0, 0, 0.1);
 }
 
 .attachmentPreview {
@@ -231,17 +240,21 @@
 
 .messageInputForm input[type="text"] {
   flex: 1;
-  background: transparent;
-  border: 1px solid var(--color-border);
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2);
   border-radius: 24px;
-  padding: 12px 20px;
+  padding: 14px 20px;
   color: var(--color-text);
   font-family: var(--font-body);
+  transition: all 0.3s ease;
 }
 
 .messageInputForm input[type="text"]:focus {
   outline: none;
-  border-color: var(--color-primary);
+  border-color: rgba(16, 185, 129, 0.5);
+  background: rgba(0, 0, 0, 0.3);
+  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2), inset 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
 .messageInputForm button {
