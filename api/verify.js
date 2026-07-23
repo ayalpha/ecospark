@@ -42,8 +42,8 @@ async function fetchImageAsBase64(url) {
 }
 
 async function callGeminiWithRetry(imagePart, prompt, maxRetries = 2) {
-  // Use gemini-1.5-pro for maximum reasoning accuracy and stability without 503 errors
-  const model = genAI.getGenerativeModel({ model: 'gemini-1.5-pro' });
+  // Use gemini-1.5-flash for highly stable, fast reasoning and generous free-tier rate limits without 503s
+  const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     const controller = new AbortController();
