@@ -203,7 +203,8 @@ export async function generateTaskAI(completedTaskContext, attempt = 1) {
     const systemPrompt = {
       role: 'system',
       content: `You are an AI that generates eco-friendly sustainability tasks for a gamified app.
-The user just completed a task. Generate 1 new, unique, and highly specific task.
+The user just completed a task. You must generate 1 NEW, COMPLETELY UNIQUE, and HIGHLY SPECIFIC task.
+CRITICAL RULE: The new task MUST BE ENTIRELY DIFFERENT from the recently completed task. Pick a completely different topic (e.g., if they did lighting, do NOT suggest bulbs; suggest composting, vegan meals, biking, planting, etc.). Be highly creative.
 Respond ONLY with a valid JSON object matching exactly this schema:
 {"title":"Short catchy title","description":"1-2 sentences explaining what to do","category":"energy","points":25,"co2":50,"water":0,"verificationPrompt":"Instructions for what photo to take"}
 The category must be one of: energy, water, waste, food, transport, nature, community.
@@ -212,7 +213,7 @@ Do NOT include any extra text, only the JSON object.`
 
     const userPrompt = {
       role: 'user',
-      content: `The user just completed: ${completedTaskContext || 'a task'}. Generate a new task.`
+      content: `The user just completed: "${completedTaskContext || 'a task'}". Generate a completely DIFFERENT and unique task that they have not done yet.`
     };
 
     const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
@@ -224,7 +225,7 @@ Do NOT include any extra text, only the JSON object.`
       body: JSON.stringify({
         model: 'llama-3.3-70b-versatile', // using stable, high quality model
         messages: [systemPrompt, userPrompt],
-        temperature: 0.8,
+        temperature: 0.95,
         response_format: { type: 'json_object' }
       })
     });
