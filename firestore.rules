@@ -69,7 +69,7 @@ service cloud.firestore {
       allow read: if isAuthenticated() &&
         (resource.data.userId == request.auth.uid || isTeacher());
       allow create: if isAuthenticated() &&
-        (request.resource.data.userId == request.auth.uid || isTeacher());
+        (request.resource.data.userId == request.auth.uid || isTeacher() || request.resource.data.type == 'earned');
       allow update, delete: if isTeacher();
     }
 
