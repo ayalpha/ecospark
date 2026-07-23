@@ -103,18 +103,18 @@ export default async function handler(req, res) {
 
 The student claims they completed this action: "${taskPrompt}"
 
-Please evaluate whether the photo provides strong evidence of this eco-friendly action being performed or completed.
+Please evaluate whether the photo provides reasonable evidence of this eco-friendly action being performed or completed.
 
-You must be STRICT and ACCURATE:
-- Carefully verify if the photo actually demonstrates the exact action claimed.
-- If the photo is completely unrelated to the prompt, you must reject it.
-- If the photo does not clearly show the claimed action, reject it.
-- Do not accept unrelated screenshots, memes, random objects, or selfies without context.
+Guidelines for Evaluation:
+- Accept reasonable, real-world photos. They do not need to be perfect or professional.
+- Accept indirect evidence (e.g., holding a reusable bottle, standing near a recycling bin).
+- ONLY reject the photo if it is completely unrelated to the prompt (e.g., a selfie with nothing else, a screenshot of a game, a meme, a completely black image).
+- If the photo plausibly relates to the action, give it a passing score.
 
 Respond with a confidence score where:
-- 0.5-1.0 = The photo clearly and definitively shows the claimed eco-friendly action.
-- 0.3-0.49 = The photo might be related, but is ambiguous or lacks clear evidence.
-- 0.0-0.29 = The photo is completely unrelated to the prompt or does not demonstrate the action at all.`;
+- 0.5-1.0 = The photo shows plausible or clear evidence of the claimed eco-friendly action.
+- 0.3-0.49 = The photo is very ambiguous but might be related.
+- 0.0-0.29 = The photo is completely unrelated or obviously fake.`;
 
     const result = await callGeminiWithRetry(imagePart, verificationPrompt);
 
