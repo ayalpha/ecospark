@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuthStore } from '../store/authStore';
 import { getRewards, redeemReward, equipFrame, unequipFrame, subscribeUserTransactions } from '../services/firestoreService';
-import { BronzeFrame, SilverFrame, GoldFrame, PlatinumFrame, GodFrame } from '../components/common/Frames';
+import { BronzeFrame, SilverFrame, GoldFrame, PlatinumFrame, GodFrame, GaiaFrame, SupernovaFrame } from '../components/common/Frames';
 import toast from 'react-hot-toast';
 import styles from './Rewards.module.css';
 
@@ -13,6 +13,8 @@ const FRAME_COMPONENTS = {
   'frame-gold': GoldFrame,
   'frame-platinum': PlatinumFrame,
   'frame-god': GodFrame,
+  'frame-gaia': GaiaFrame,
+  'frame-supernova': SupernovaFrame,
 };
 
 const TIER_CONFIG = {
@@ -21,6 +23,8 @@ const TIER_CONFIG = {
   gold: { color: '#F59E0B', glow: 'var(--glow-gold)', label: 'Gold' },
   platinum: { color: '#7C3AED', glow: '0 0 20px rgba(124,58,237,0.5)', label: 'Platinum' },
   god: { color: '#FACC15', glow: '0 0 30px rgba(250,204,21,0.8)', label: 'God' },
+  gaia: { color: '#10B981', glow: '0 0 35px rgba(16,185,129,0.6)', label: 'Legendary' },
+  supernova: { color: '#8B5CF6', glow: '0 0 40px rgba(139,92,246,0.7)', label: 'Legendary' },
 };
 
 const HARDCODED_FRAMES = [
@@ -28,7 +32,9 @@ const HARDCODED_FRAMES = [
   { id: 'frame-silver', name: 'Silver Frame', description: 'An elegant silver frame.', pointCost: 1000, tier: 'silver', icon: '🥈' },
   { id: 'frame-gold', name: 'Gold Frame', description: 'A luxurious gold frame.', pointCost: 2500, tier: 'gold', icon: '🥇' },
   { id: 'frame-platinum', name: 'Platinum Frame', description: 'A shining platinum frame.', pointCost: 5000, tier: 'platinum', icon: '💎' },
-  { id: 'frame-god', name: 'Supreme God Frame', description: 'The ultimate celestial frame.', pointCost: 10000, tier: 'god', icon: '👑' }
+  { id: 'frame-god', name: 'Supreme God Frame', description: 'The ultimate celestial frame.', pointCost: 10000, tier: 'god', icon: '👑' },
+  { id: 'frame-gaia', name: 'Gaia Crown', description: 'Earth\'s Guardian — a legendary emerald aura with golden shimmer. Only the most dedicated eco-warriors wield this.', pointCost: 25000, tier: 'gaia', icon: '🌿' },
+  { id: 'frame-supernova', name: 'Supernova', description: 'Cosmic Energy — a legendary deep-space frame with rotating neon gradients and orbiting energy orbs. The rarest frame in existence.', pointCost: 50000, tier: 'supernova', icon: '🌌' },
 ];
 
 function ConfettiParticle({ delay }) {
