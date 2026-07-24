@@ -10,9 +10,9 @@ export function Capabilities() {
 
       <div className="relative z-10 px-8 md:px-16 lg:px-20 pt-24 pb-10 flex flex-col min-h-screen">
         <div className="mb-auto">
-          <div className="text-sm font-body text-white/80 mb-6">// Capabilities</div>
+          <div className="text-sm font-body text-white/80 mb-6">// Features</div>
           <h2 className="font-heading italic text-white text-6xl md:text-7xl lg:text-[6rem] leading-[0.9] tracking-[-3px]">
-            Production<br />evolved
+            Make an<br />impact
           </h2>
         </div>
 
@@ -26,16 +26,16 @@ export function Capabilities() {
                 </svg>
               </div>
               <div className="flex flex-wrap justify-end gap-1.5 max-w-[70%]">
-                {['Natural Context', 'Photo Realism', 'Infinite Settings', 'Eco-Vibe'].map(tag => (
+                {['Real-time', 'Fair & Lenient', 'Smart Analysis', 'Zero Wait'].map(tag => (
                   <span key={tag} className="liquid-glass rounded-full px-3 py-1 text-[11px] text-white/90 font-body whitespace-nowrap">{tag}</span>
                 ))}
               </div>
             </div>
             <div className="flex-1" />
             <div className="mt-6">
-              <h3 className="font-heading italic text-white text-3xl md:text-4xl tracking-[-1px] leading-none">AI Scenery</h3>
+              <h3 className="font-heading italic text-white text-3xl md:text-4xl tracking-[-1px] leading-none">AI Verification</h3>
               <p className="mt-3 text-sm text-white/90 font-body font-light leading-snug max-w-[32ch]">
-                AI analyzes your product to create indistinguishable natural environments — from Icelandic cliffs to misty forests.
+                Smart AI automatically verifies your real-world eco-actions from simple photos. No manual grading required from teachers.
               </p>
             </div>
           </div>
@@ -49,16 +49,16 @@ export function Capabilities() {
                 </svg>
               </div>
               <div className="flex flex-wrap justify-end gap-1.5 max-w-[70%]">
-                {['Scale Fast', 'Visual Consistency', 'Time Saver', 'Ready to Post'].map(tag => (
+                {['Infinite Content', 'Auto-scaling', 'Fresh Ideas', 'Dynamic'].map(tag => (
                   <span key={tag} className="liquid-glass rounded-full px-3 py-1 text-[11px] text-white/90 font-body whitespace-nowrap">{tag}</span>
                 ))}
               </div>
             </div>
             <div className="flex-1" />
             <div className="mt-6">
-              <h3 className="font-heading italic text-white text-3xl md:text-4xl tracking-[-1px] leading-none">Batch Production</h3>
+              <h3 className="font-heading italic text-white text-3xl md:text-4xl tracking-[-1px] leading-none">Global Task Pool</h3>
               <p className="mt-3 text-sm text-white/90 font-body font-light leading-snug max-w-[32ch]">
-                Style your entire product line in minutes. Create a unified visual identity for catalogues and social media without weeks of retouching.
+                Progress through an ever-expanding universe of tasks. When the world runs out, our AI generates completely new challenges.
               </p>
             </div>
           </div>
@@ -72,16 +72,16 @@ export function Capabilities() {
                 </svg>
               </div>
               <div className="flex flex-wrap justify-end gap-1.5 max-w-[70%]">
-                {['Ray Tracing', 'Physical Shadows', 'Studio Quality', 'Sunlight Sync'].map(tag => (
+                {['Gamified', 'Premium Rewards', 'Leaderboards', 'Real Impact'].map(tag => (
                   <span key={tag} className="liquid-glass rounded-full px-3 py-1 text-[11px] text-white/90 font-body whitespace-nowrap">{tag}</span>
                 ))}
               </div>
             </div>
             <div className="flex-1" />
             <div className="mt-6">
-              <h3 className="font-heading italic text-white text-3xl md:text-4xl tracking-[-1px] leading-none">Smart Lighting</h3>
+              <h3 className="font-heading italic text-white text-3xl md:text-4xl tracking-[-1px] leading-none">Earn & Redeem</h3>
               <p className="mt-3 text-sm text-white/90 font-body font-light leading-snug max-w-[32ch]">
-                Automatic lighting and material adjustment. Achieve flawless integration with realistic shadows and sunlight.
+                Turn real-world sustainable habits into digital rewards. Climb the leaderboard and unlock exclusive premium tiers.
               </p>
             </div>
           </div>

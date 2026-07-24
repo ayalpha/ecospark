@@ -125,7 +125,10 @@ export default function TaskLogModal({ task, onClose, onSuccess }) {
             toast.success(<span>+{task.points || 50} points earned! <PremiumIcon icon={Leaf} color="emerald" size={16} /></span>);
           }
 
-          onSuccess?.(data);
+          // Delay closing the modal for 3.5 seconds so the user can read the AI's reasoning!
+          setTimeout(() => {
+            onSuccess?.(data);
+          }, 3500);
         }
       });
     } catch (err) {

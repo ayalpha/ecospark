@@ -204,7 +204,15 @@ export default function Tasks() {
 
   // Replenishment: Keep the board at 10 tasks max. Take first 10 uncompleted + any completed
   // (so completed tasks stay visible in 'done' filter, but uncompleted ones replenish).
-  const uncompletedAll = tasks.filter(t => !submissions.some(s => s.taskId === t.id && s.status === 'approved'));
+  const uncompletedAll = tasks.filter(t => {
+    if (submissions.some(s => s.taskId === t.id && s.status === 'approved')) return false;
+    
+    // 3-STRIKE RULE: If a teacher rejects this task 3 times, it's permanently removed!
+    const rejectedCount = submissions.filter(s => s.taskId === t.id && s.status === 'rejected').length;
+    if (rejectedCount >= 3) return false;
+    
+    return true;
+  });
   
   // Only show active unexpired tasks
   const activeUncompleted = uncompletedAll.filter(t => !t.expiresAt || t.expiresAt > Date.now());

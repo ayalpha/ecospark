@@ -11,6 +11,31 @@ import { db } from '../lib/firebase';
 
 // ─── USER PROFILES ──────────────────────────────────────────────────────────
 
+export async function incrementGlobalUserCount() {
+  try {
+    const statsRef = doc(db, 'settings', 'stats');
+    await updateDoc(statsRef, {
+      totalUsers: increment(1)
+    }).catch(async (err) => {
+      if (err.code === 'not-found') {
+        await setDoc(statsRef, { totalUsers: 1 });
+      }
+    });
+  } catch (e) {
+    console.error('Failed to increment global user count', e);
+  }
+}
+
+export async function getGlobalUserCount() {
+  try {
+    const snap = await getDoc(doc(db, 'settings', 'stats'));
+    if (snap.exists()) return snap.data().totalUsers || 25;
+    return 25;
+  } catch (e) {
+    return 25;
+  }
+}
+
 export async function createUserProfile(uid, data) {
   await setDoc(doc(db, 'users', uid), {
     ...data,
@@ -41,6 +66,8 @@ export async function createUserProfile(uid, data) {
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   });
+  
+  await incrementGlobalUserCount();
 }
 
 export async function getUserProfile(uid) {
@@ -309,9 +336,23 @@ export async function getPublicProfile(userId) {
     activeFrame: data.activeFrame || null,
     followersCount: data.followersCount || 0,
     followingCount: data.followingCount || 0,
+    blockedUsers: data.blockedUsers || [],
     createdAt: data.createdAt,
     lastActivityDate: data.lastActivityDate || null,
   };
+}
+
+export async function toggleBlockUser(currentUserId, targetUserId, isBlocking) {
+  const userRef = doc(db, 'users', currentUserId);
+  if (isBlocking) {
+    await updateDoc(userRef, {
+      blockedUsers: arrayUnion(targetUserId)
+    });
+  } else {
+    await updateDoc(userRef, {
+      blockedUsers: arrayRemove(targetUserId)
+    });
+  }
 }
 
 // ─── REWARDS ──────────────────────────────────────────────────────────────────

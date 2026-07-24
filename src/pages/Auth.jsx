@@ -57,25 +57,48 @@ export default function Auth() {
       if (mode === 'signup') {
         const cred = await createUserWithEmailAndPassword(auth, form.email, form.password);
         await updateProfile(cred.user, { displayName: form.name });
+        
+        // Send email verification link
+        const { sendEmailVerification, signOut } = await import('firebase/auth');
+        await sendEmailVerification(cred.user);
+
         await createUserProfile(cred.user.uid, {
           displayName: form.name,
           email: form.email,
           photoURL: null,
         });
         if (form.referralCode) await processReferral(cred.user.uid, form.referralCode);
-        toast.success('Welcome to EcoSpark! 🌱');
+        
+        // Sign them out until they verify
+        await signOut(auth);
+        
+        toast.success('Account created! Please check your email to verify your account before logging in.', { duration: 6000 });
+        setMode('signin');
+        setLoading(false);
+        return; // Do not navigate to dashboard
       } else {
         const cred = await signInWithEmailAndPassword(auth, form.email, form.password);
         
+        const { signOut, sendEmailVerification } = await import('firebase/auth');
+
+        // Enforce Email Verification
+        if (!cred.user.emailVerified) {
+          await sendEmailVerification(cred.user).catch(() => {}); // silently resend if they forgot
+          await signOut(auth);
+          toast.error('Please verify your email address first. We just sent a new link to your inbox.', { duration: 6000 });
+          setLoading(false);
+          return;
+        }
+
         // Check if banned
         const { getDoc, doc } = await import('firebase/firestore');
         const { db } = await import('../lib/firebase');
         const userDoc = await getDoc(doc(db, 'users', cred.user.uid));
         
         if (userDoc.exists() && userDoc.data().banned) {
-          const { signOut } = await import('firebase/auth');
           await signOut(auth);
           toast.error('You are banned! This account cannot access EcoSpark.', { duration: 5000 });
+          setLoading(false);
           return;
         }
 
@@ -85,9 +108,9 @@ export default function Auth() {
     } catch (err) {
       const msg = err.code === 'auth/email-already-in-use'
         ? 'Email already in use. Try signing in!'
-        : err.code === 'auth/wrong-password' || err.code === 'auth/user-not-found'
-        ? 'Invalid email or password'
-        : err.message;
+        : ['auth/wrong-password', 'auth/user-not-found', 'auth/invalid-credential', 'auth/invalid-login-credentials'].includes(err.code)
+        ? 'Invalid email or password. Please try again.'
+        : err.message.replace('Firebase:', '').trim();
       toast.error(msg);
     } finally {
       setLoading(false);

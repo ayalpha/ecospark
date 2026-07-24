@@ -117,9 +117,6 @@ async function performClientSideVerification(submissionId, imageUrl, taskPrompt)
     return;
   }
 
-  const genAI = new GoogleGenerativeAI(apiKey);
-  const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
-
   try {
     let imagePart;
     if (imageUrl.startsWith('data:image/')) {
@@ -150,22 +147,33 @@ Respond with a confidence score where:
 Respond ONLY with a JSON object like this (no markdown, no extra text):
 {"approved": true/false, "confidence": 0.0-1.0, "reason": "one sentence explanation"}`;
 
-    // Add a retry loop to handle 503 High Demand errors from Gemini
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const FALLBACK_MODELS = [
+      'gemini-2.5-flash',
+      'gemini-3.5-flash-lite',
+      'gemini-3.1-flash-lite',
+      'gemini-2.5-flash-lite'
+    ];
+
     let result;
-    let retries = 3;
-    while (retries > 0) {
+    let success = false;
+    let lastError = null;
+
+    for (const modelName of FALLBACK_MODELS) {
       try {
+        const model = genAI.getGenerativeModel({ model: modelName });
         result = await model.generateContent([{ text: verificationPrompt }, imagePart]);
+        success = true;
         break; // Success!
       } catch (err) {
-        if ((err.status === 503 || err.message?.includes('503')) && retries > 1) {
-          console.warn(`Gemini 503 Error. Retrying... (${retries - 1} left)`);
-          await new Promise(r => setTimeout(r, 3000)); // wait 3 seconds before retry
-          retries--;
-        } else {
-          throw err;
-        }
+        lastError = err;
+        console.warn(`Model ${modelName} failed (${err.status || err.message}). Trying next model...`);
+        await new Promise(r => setTimeout(r, 1500)); // wait briefly before trying next
       }
+    }
+
+    if (!success) {
+      throw lastError || new Error("All fallback models failed.");
     }
 
     const text = result.response.text().trim();
@@ -218,8 +226,12 @@ The user just completed a task. You must generate 1 NEW, COMPLETELY UNIQUE, and 
 CRITICAL RULE: The new task MUST BE ENTIRELY DIFFERENT from the recently completed task. Pick a completely different topic (e.g., if they did lighting, do NOT suggest bulbs; suggest composting, vegan meals, biking, planting, etc.). Be highly creative.${avoidList}
 
 Respond ONLY with a valid JSON object matching exactly this schema:
-{"title":"Short catchy title","description":"1-2 sentences explaining what to do","category":"energy","points":25,"co2":50,"water":0,"verificationPrompt":"Instructions for what photo to take"}
-The category must be one of: energy, water, waste, food, transport, nature, community.
+{"title":"Short catchy title","description":"1-2 sentences explaining what to do","category":"energy","difficulty":"easy","points":70,"co2":50,"water":0,"verificationPrompt":"Instructions for what photo to take"}
+
+Rules for fields:
+- category: energy, water, waste, food, transport, nature, community.
+- difficulty: easy, medium, or hard.
+- points: ~70 for easy, ~150 for medium, 200-250 for hard.
 Do NOT include any extra text, only the JSON object.`
     };
 

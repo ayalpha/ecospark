@@ -26,6 +26,7 @@ const Notifications = React.lazy(() => import('./pages/Notifications'));
 const Admin = React.lazy(() => import('./pages/Admin'));
 const About = React.lazy(() => import('./pages/About'));
 const Landing = React.lazy(() => import('./pages/Landing'));
+const News = React.lazy(() => import('./pages/News'));
 
 function LoadingScreen() {
   return (
@@ -191,6 +192,7 @@ export default function App() {
                   <AppShell>
                     <Routes location={location} key={location.pathname}>
                       <Route path="/" element={<Home />} />
+                      <Route path="/news" element={<News />} />
                       <Route path="/tasks" element={<Tasks />} />
                       <Route path="/leaderboard" element={<Leaderboard />} />
                       <Route path="/rewards" element={<Rewards />} />

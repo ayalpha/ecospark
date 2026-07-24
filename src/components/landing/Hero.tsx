@@ -3,6 +3,8 @@ import { FadingVideo } from './FadingVideo';
 import { BlurText } from './BlurText';
 import { ArrowUpRight, PlayIcon, ClockIcon, GlobeIcon } from './Icons';
 import { Link } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { getGlobalUserCount } from '../../services/firestoreService';
 
 const fadeUpVariant = {
   initial: { filter: 'blur(10px)', opacity: 0, y: 20 },
@@ -10,6 +12,14 @@ const fadeUpVariant = {
 };
 
 export function Hero() {
+  const [totalUsers, setTotalUsers] = useState(25);
+
+  useEffect(() => {
+    getGlobalUserCount().then(count => {
+      setTotalUsers(count);
+    });
+  }, []);
+
   return (
     <section className="relative min-h-screen flex flex-col justify-between overflow-hidden bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-[#1a1c29] via-black to-black">
       <FadingVideo
@@ -75,7 +85,7 @@ export function Hero() {
           <div className="liquid-glass rounded-[1.25rem] p-5 w-[220px] flex flex-col justify-between items-start text-left min-h-[140px]">
             <GlobeIcon className="w-7 h-7 text-white mb-4" />
             <div>
-              <div className="font-heading italic text-white text-4xl tracking-[-1px] leading-none">25+</div>
+              <div className="font-heading italic text-white text-4xl tracking-[-1px] leading-none">{totalUsers > 25 ? `${totalUsers}` : '25+'}</div>
               <div className="text-xs text-white/90 font-body font-light mt-2">Eco-Warriors Across the Globe</div>
             </div>
           </div>

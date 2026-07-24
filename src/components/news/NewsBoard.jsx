@@ -1,5 +1,6 @@
 // src/components/news/NewsBoard.jsx
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { fetchGreenNews } from '../../services/newsService';
 import ErrorBoundary from '../common/ErrorBoundary';
@@ -70,7 +71,9 @@ function NewsBoardInner() {
           Latest Green News
         </h2>
         {!loading && !error && (
-          <span className={styles.badge}>{articles.length} stories</span>
+          <Link to="/news" className={styles.badge} style={{ textDecoration: 'none' }}>
+            View More
+          </Link>
         )}
       </div>
 
@@ -92,7 +95,7 @@ function NewsBoardInner() {
               <p>No stories found. Try refreshing later.</p>
             </div>
           )
-          : articles.map((a, i) => (
+          : articles.slice(0, 4).map((a, i) => (
             <NewsCard key={i} article={a} onClick={setSelected} />
           ))
         }

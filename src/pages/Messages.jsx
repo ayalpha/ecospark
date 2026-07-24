@@ -1,10 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
-import { subscribeConversations, subscribeMessages, sendMessage, getPublicProfile, markChatAsRead } from '../services/firestoreService';
+import { subscribeConversations, subscribeMessages, sendMessage, getPublicProfile, markChatAsRead, toggleBlockUser } from '../services/firestoreService';
 import { convertFileToBase64 } from '../lib/fileUtils';
 import Avatar from '../components/common/Avatar';
-import { Send, ArrowLeft, Paperclip, X } from 'lucide-react';
+import { Send, ArrowLeft, Paperclip, X, Smile, MoreVertical, Ban } from 'lucide-react';
 import toast from 'react-hot-toast';
 import styles from './Messages.module.css';
 
@@ -19,9 +19,20 @@ export default function Messages() {
   const [profilesCache, setProfilesCache] = useState({});
   const [attachment, setAttachment] = useState(null);
   const [sending, setSending] = useState(false);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [showMenu, setShowMenu] = useState(false);
   
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
+
+  const ANIMATED_EMOJIS = [
+    'https://fonts.gstatic.com/s/e/notoemoji/latest/1f602/512.gif', // Laugh
+    'https://fonts.gstatic.com/s/e/notoemoji/latest/1f60d/512.gif', // Heart Eyes
+    'https://fonts.gstatic.com/s/e/notoemoji/latest/1f525/512.gif', // Fire
+    'https://fonts.gstatic.com/s/e/notoemoji/latest/1f44d/512.gif', // Thumbs Up
+    'https://fonts.gstatic.com/s/e/notoemoji/latest/1f389/512.gif', // Party
+    'https://fonts.gstatic.com/s/e/notoemoji/latest/1f62d/512.gif', // Cry
+  ];
 
   // Subscribe to user's conversations
   useEffect(() => {
@@ -128,6 +139,30 @@ export default function Messages() {
   const otherUserId = activeChat?.participants.find(p => p !== profile?.id);
   const otherUser = otherUserId ? profilesCache[otherUserId] : null;
 
+  const isBlocked = profile?.blockedUsers?.includes(otherUserId);
+  const hasBlockedMe = otherUser?.blockedUsers?.includes(profile?.id);
+
+  const handleToggleBlock = async () => {
+    if (!otherUserId || !profile?.id) return;
+    try {
+      await toggleBlockUser(profile.id, otherUserId, !isBlocked);
+      toast.success(isBlocked ? 'User unblocked' : 'User blocked');
+      setShowMenu(false);
+    } catch (e) {
+      toast.error('Failed to update block status');
+    }
+  };
+
+  const handleSendEmoji = async (emojiUrl) => {
+    if (!chatId || !profile?.id) return;
+    setShowEmojiPicker(false);
+    try {
+      await sendMessage(chatId, profile.id, '', emojiUrl, 'image');
+    } catch (e) {
+      toast.error('Failed to send emoji');
+    }
+  };
+
   return (
     <div className={styles.container}>
       {/* Sidebar: Conversations List */}
@@ -205,8 +240,45 @@ export default function Messages() {
               <button className={styles.backBtn} onClick={() => navigate('/messages')}>
                 <ArrowLeft size={24} />
               </button>
-              <Avatar src={otherUser?.photoURL} activeFrame={otherUser?.activeFrame} size={40} />
-              <h3>{otherUser?.displayName || 'User'}</h3>
+              <div 
+                style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}
+                onClick={() => navigate(`/user/${otherUserId}`)}
+              >
+                <Avatar src={otherUser?.photoURL} activeFrame={otherUser?.activeFrame} size={40} />
+                <h3>{otherUser?.displayName || 'User'}</h3>
+              </div>
+              
+              <div style={{ marginLeft: 'auto', position: 'relative' }}>
+                <button 
+                  className={styles.attachBtn} 
+                  onClick={() => setShowMenu(!showMenu)}
+                  style={{ background: 'transparent', border: 'none', color: 'var(--color-text-secondary)', cursor: 'pointer' }}
+                >
+                  <MoreVertical size={20} />
+                </button>
+                
+                {showMenu && (
+                  <div style={{
+                    position: 'absolute', right: 0, top: '100%', marginTop: 8,
+                    background: 'var(--color-surface)', border: '1px solid var(--color-border)',
+                    borderRadius: 12, padding: 8, zIndex: 100, minWidth: 150, boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+                  }}>
+                    <button 
+                      onClick={handleToggleBlock}
+                      style={{ 
+                        width: '100%', display: 'flex', alignItems: 'center', gap: 8, 
+                        background: 'transparent', border: 'none', color: isBlocked ? 'var(--color-text)' : 'var(--color-ruby)', 
+                        padding: '8px 12px', cursor: 'pointer', borderRadius: 8, textAlign: 'left', fontWeight: 500
+                      }}
+                      onMouseOver={e => e.currentTarget.style.background = 'var(--color-bg)'}
+                      onMouseOut={e => e.currentTarget.style.background = 'transparent'}
+                    >
+                      <Ban size={16} />
+                      {isBlocked ? 'Unblock User' : 'Block User'}
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
             
             <div className={styles.messagesList}>
@@ -240,45 +312,94 @@ export default function Messages() {
             </div>
 
             <div className={styles.inputArea}>
-              {attachment && (
-                <div className={styles.attachmentPreview}>
-                  <button className={styles.removeAttachmentBtn} onClick={() => setAttachment(null)}>
-                    <X size={16} />
-                  </button>
-                  {attachment.type === 'video' ? (
-                    <video src={attachment.url} className={styles.previewMedia} />
-                  ) : (
-                    <img src={attachment.url} alt="Preview" className={styles.previewMedia} />
-                  )}
+              {isBlocked ? (
+                <div style={{ width: '100%', textAlign: 'center', padding: '16px', color: 'var(--color-text-secondary)', background: 'var(--color-surface)', borderRadius: '12px' }}>
+                  You have blocked this user.
                 </div>
+              ) : hasBlockedMe ? (
+                <div style={{ width: '100%', textAlign: 'center', padding: '16px', color: 'var(--color-text-secondary)', background: 'var(--color-surface)', borderRadius: '12px' }}>
+                  You cannot reply to this conversation.
+                </div>
+              ) : (
+                <>
+                  {attachment && (
+                    <div className={styles.attachmentPreview}>
+                      <button className={styles.removeAttachmentBtn} onClick={() => setAttachment(null)}>
+                        <X size={16} />
+                      </button>
+                      {attachment.type === 'video' ? (
+                        <video src={attachment.url} className={styles.previewMedia} />
+                      ) : (
+                        <img src={attachment.url} alt="Preview" className={styles.previewMedia} />
+                      )}
+                    </div>
+                  )}
+                  <form className={styles.messageInputForm} onSubmit={handleSend} style={{ position: 'relative' }}>
+                    <input 
+                      type="file" 
+                      accept="image/*,video/*" 
+                      ref={fileInputRef}
+                      style={{ display: 'none' }}
+                      onChange={handleAttachmentChange}
+                    />
+                    
+                    <button 
+                      type="button" 
+                      className={styles.attachBtn}
+                      onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                      disabled={sending}
+                      title="Send 3D Emoji"
+                    >
+                      <Smile size={20} />
+                    </button>
+
+                    {showEmojiPicker && (
+                      <div style={{
+                        position: 'absolute', bottom: '100%', left: 0, marginBottom: 12,
+                        background: 'var(--color-surface)', border: '1px solid var(--color-border)',
+                        borderRadius: 16, padding: 12, display: 'flex', gap: 12, zIndex: 100,
+                        boxShadow: '0 8px 24px rgba(0,0,0,0.15)'
+                      }}>
+                        {ANIMATED_EMOJIS.map((emoji, idx) => (
+                          <button
+                            key={idx}
+                            type="button"
+                            onClick={() => handleSendEmoji(emoji)}
+                            style={{
+                              background: 'transparent', border: 'none', cursor: 'pointer',
+                              padding: 4, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              transition: 'transform 0.2s'
+                            }}
+                            onMouseOver={e => e.currentTarget.style.transform = 'scale(1.15)'}
+                            onMouseOut={e => e.currentTarget.style.transform = 'scale(1)'}
+                          >
+                            <img src={emoji} alt="emoji" style={{ width: 40, height: 40, objectFit: 'contain' }} />
+                          </button>
+                        ))}
+                      </div>
+                    )}
+
+                    <button 
+                      type="button" 
+                      className={styles.attachBtn}
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={sending}
+                    >
+                      <Paperclip size={20} />
+                    </button>
+                    <input 
+                      type="text" 
+                      placeholder="Message..." 
+                      value={inputText}
+                      onChange={e => setInputText(e.target.value)}
+                      disabled={sending}
+                    />
+                    <button type="submit" disabled={(!inputText.trim() && !attachment) || sending}>
+                      {sending ? '...' : <Send size={20} />}
+                    </button>
+                  </form>
+                </>
               )}
-              <form className={styles.messageInputForm} onSubmit={handleSend}>
-                <input 
-                  type="file" 
-                  accept="image/*,video/*" 
-                  ref={fileInputRef}
-                  style={{ display: 'none' }}
-                  onChange={handleAttachmentChange}
-                />
-                <button 
-                  type="button" 
-                  className={styles.attachBtn}
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={sending}
-                >
-                  <Paperclip size={20} />
-                </button>
-                <input 
-                  type="text" 
-                  placeholder="Message..." 
-                  value={inputText}
-                  onChange={e => setInputText(e.target.value)}
-                  disabled={sending}
-                />
-                <button type="submit" disabled={(!inputText.trim() && !attachment) || sending}>
-                  {sending ? '...' : <Send size={20} />}
-                </button>
-              </form>
             </div>
           </>
         )}
