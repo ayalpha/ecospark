@@ -370,3 +370,4 @@ p {
 .animate-fade-in { animation: fadeIn var(--transition-enter) both; }
 .animate-slide-up { animation: slideUp var(--transition-enter) both; }
 .animate-scale-in { animation: scaleIn var(--transition-spring) both; }
+@import './rewards.css';

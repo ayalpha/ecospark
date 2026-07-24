@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
+import { motion } from 'framer-motion';
 import { useAuthStore } from '../store/authStore';
 import { useUser } from '../lib/useUser';
 import { createOrGetChat } from '../services/firestoreService';
 import Avatar from '../components/common/Avatar';
 import { MessageCircle, ArrowLeft, Image as ImageIcon, Award, Activity } from 'lucide-react';
+import { REWARDS_DB } from '../constants/rewards';
 import styles from './UserProfile.module.css';
 
 export default function UserProfile() {
@@ -58,10 +60,18 @@ export default function UserProfile() {
 
   const userGradient = profile ? getGradientFromId(profile.id) : '';
 
+  const equippedGlow = profile?.equipped?.glow;
+  const equippedCompanion = profile?.equipped?.companion;
+  const equippedBg = profile?.equipped?.background;
+
+  const glowReward = REWARDS_DB.find(r => r.id === equippedGlow);
+  const companionReward = REWARDS_DB.find(r => r.id === equippedCompanion);
+  const bgReward = REWARDS_DB.find(r => r.id === equippedBg);
+
   return (
-    <div className={styles.page}>
+    <div className={`${styles.page} ${bgReward ? bgReward.cssClass : ''}`}>
       {/* Premium Banner */}
-      <div className={styles.banner} style={{ background: userGradient, backgroundSize: '200% 200%' }}>
+      <div className={styles.banner} style={{ background: bgReward ? 'transparent' : userGradient, backgroundSize: '200% 200%' }}>
         <div className={styles.bannerOverlay}></div>
         <Link to={-1} className={styles.backBtn}>
           <ArrowLeft size={24} />
@@ -70,14 +80,28 @@ export default function UserProfile() {
 
       {/* Main Profile Card (Glassmorphism) */}
       <div className={styles.profileCard}>
-        <div className={styles.avatarContainer}>
+        <div className={styles.avatarContainer} style={{ position: 'relative' }}>
           <Avatar src={profile.photoURL} activeFrame={profile.activeFrame} size={120} alt={profile.displayName} />
-          <div className={styles.levelBadge}>{profile.streak || 0}🔥</div>
+          {companionReward && (
+            <div className="companion-wrapper" style={{ 
+              position: 'absolute', 
+              bottom: -20, 
+              left: (companionReward.id === 'comp-terrabot' || companionReward.id === 'comp-waterwisp') ? -55 : undefined,
+              right: (companionReward.id === 'comp-terrabot' || companionReward.id === 'comp-waterwisp') ? undefined : -55, 
+              pointerEvents: 'none' 
+            }}>
+              {companionReward.imageUrl ? (
+                <img src={companionReward.imageUrl} alt="companion" style={{ width: '100px', height: '100px', objectFit: 'contain', filter: 'drop-shadow(0 0 10px rgba(255,255,255,0.3))' }} />
+              ) : (
+                <span style={{ fontSize: '3rem' }}>{companionReward.icon}</span>
+              )}
+            </div>
+          )}
         </div>
 
         <div className={styles.profileInfo}>
           <div className={styles.nameSection}>
-            <h1 className={styles.title}>{profile.displayName || 'EcoUser'}</h1>
+            <h1 className={`${styles.title} ${glowReward ? glowReward.cssClass : ''}`}>{profile.displayName || 'EcoUser'}</h1>
             <p className={styles.subtitle}>{profile.bio || (profile.role === 'admin' ? '✨ Platform Admin' : 'Sustainability Advocate')}</p>
           </div>
 
@@ -98,6 +122,19 @@ export default function UserProfile() {
         </div>
 
         <div className={styles.highlightStats}>
+          <div className={styles.statBox}>
+            <span className={styles.statBoxVal}>
+              {profile.streak || 0}
+              <motion.span 
+                animate={{ scale: [1, 1.3, 1], rotate: [0, -10, 10, 0] }}
+                transition={{ repeat: Infinity, duration: 1.5, ease: 'easeInOut' }}
+                style={{ display: 'inline-block', color: '#ff6b6b', marginLeft: '6px' }}
+              >
+                🔥
+              </motion.span>
+            </span>
+            <span className={styles.statBoxLabel}>Day Streak</span>
+          </div>
           <div className={styles.statBox}>
             <span className={styles.statBoxVal}>{(profile.lifetimePoints || 0).toLocaleString()}</span>
             <span className={styles.statBoxLabel}>Lifetime Points</span>

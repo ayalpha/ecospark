@@ -2,8 +2,9 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuthStore } from '../store/authStore';
-import { getRewards, redeemReward, equipFrame, unequipFrame, subscribeUserTransactions } from '../services/firestoreService';
+import { redeemReward, equipReward, unequipReward, subscribeUserTransactions } from '../services/firestoreService';
 import { BronzeFrame, SilverFrame, GoldFrame, PlatinumFrame, GodFrame, GaiaFrame, SupernovaFrame, PrimeFrame } from '../components/common/Frames';
+import { REWARDS_DB, TIER_CONFIG } from '../constants/rewards';
 import toast from 'react-hot-toast';
 import { useSettingsStore } from '../store/settingsStore';
 import styles from './Rewards.module.css';
@@ -18,28 +19,6 @@ const FRAME_COMPONENTS = {
   'frame-supernova': SupernovaFrame,
   'frame-prime': PrimeFrame,
 };
-
-const TIER_CONFIG = {
-  bronze: { color: '#CD7F32', glow: '0 0 20px rgba(205,127,50,0.4)', label: 'Bronze' },
-  silver: { color: '#9CA3AF', glow: '0 0 20px rgba(156,163,175,0.5)', label: 'Silver' },
-  gold: { color: '#F59E0B', glow: 'var(--glow-gold)', label: 'Gold' },
-  platinum: { color: '#7C3AED', glow: '0 0 20px rgba(124,58,237,0.5)', label: 'Platinum' },
-  god: { color: '#FACC15', glow: '0 0 30px rgba(250,204,21,0.8)', label: 'God' },
-  gaia: { color: '#10B981', glow: '0 0 35px rgba(16,185,129,0.6)', label: 'Legendary' },
-  supernova: { color: '#8B5CF6', glow: '0 0 40px rgba(139,92,246,0.7)', label: 'Legendary' },
-  prime: { color: '#FFD700', glow: '0 0 50px rgba(255,215,0,1)', label: 'Prime' },
-};
-
-const HARDCODED_FRAMES = [
-  { id: 'frame-bronze', name: 'Bronze Frame', description: 'A sturdy bronze frame for your avatar.', pointCost: 500, tier: 'bronze', icon: '🥉' },
-  { id: 'frame-silver', name: 'Silver Frame', description: 'An elegant silver frame.', pointCost: 1000, tier: 'silver', icon: '🥈' },
-  { id: 'frame-gold', name: 'Gold Frame', description: 'A luxurious gold frame.', pointCost: 2500, tier: 'gold', icon: '🥇' },
-  { id: 'frame-platinum', name: 'Platinum Frame', description: 'A shining platinum frame.', pointCost: 5000, tier: 'platinum', icon: '💎' },
-  { id: 'frame-god', name: 'Supreme God Frame', description: 'The ultimate celestial frame.', pointCost: 10000, tier: 'god', icon: '👑' },
-  { id: 'frame-gaia', name: 'Gaia Crown', description: 'Earth\'s Guardian — a legendary emerald aura with golden shimmer. Only the most dedicated eco-warriors wield this.', pointCost: 25000, tier: 'gaia', icon: '🌿' },
-  { id: 'frame-supernova', name: 'Supernova', description: 'Cosmic Energy — a legendary deep-space frame with rotating neon gradients and orbiting energy orbs. The rarest frame in existence.', pointCost: 50000, tier: 'supernova', icon: '🌌' },
-  { id: 'frame-prime', name: 'Prime Frame', description: 'The Ascended Aura — the ultimate, reality-bending celestial frame. Reserved only for the most elite eco-gods.', pointCost: 999999, tier: 'prime', icon: '✨' },
-];
 
 function ConfettiParticle({ delay }) {
   const colors = ['#2E7D32', '#F59E0B', '#00897B', '#EF4444', '#3B82F6'];
@@ -62,7 +41,7 @@ function ConfettiParticle({ delay }) {
 function RewardCard({ reward, userPoints, owned, onRedeem, onEquip, onUnequip, isEquipped }) {
   const cfg = TIER_CONFIG[reward.tier] || TIER_CONFIG.bronze;
   const canAfford = userPoints >= reward.pointCost;
-  const isFrame = reward.id?.startsWith('frame-');
+  const isFrame = reward.type === 'frame';
   const FrameComponent = isFrame ? FRAME_COMPONENTS[reward.id] : null;
 
   return (
@@ -78,8 +57,24 @@ function RewardCard({ reward, userPoints, owned, onRedeem, onEquip, onUnequip, i
           <div style={{ width: '80%', height: '80%', position: 'relative', zIndex: 2 }}>
             <FrameComponent />
           </div>
+        ) : reward.type === 'glow' ? (
+          <span className={reward.cssClass} style={{ fontSize: '1.5rem', zIndex: 2, position: 'relative' }}>EcoUser</span>
+        ) : reward.type === 'background' ? (
+          <div className={reward.cssClass} style={{ 
+            width: '80%', height: '80%', borderRadius: '8px', zIndex: 2, minHeight: 'auto', padding: 0, position: 'relative',
+            boxShadow: 'inset 0 0 10px rgba(255,255,255,0.5), 0 0 15px rgba(255,255,255,0.3)',
+            border: '2px solid rgba(255,255,255,0.8)'
+          }}>
+            <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, background: 'linear-gradient(135deg, rgba(255,255,255,0.6) 0%, transparent 50%)', borderRadius: '6px', pointerEvents: 'none' }} />
+          </div>
+        ) : reward.type === 'companion' ? (
+          reward.imageUrl ? (
+            <img src={reward.imageUrl} alt={reward.name} style={{ width: '60%', height: '60%', objectFit: 'contain', zIndex: 2, position: 'relative', filter: 'drop-shadow(0 0 10px rgba(255,255,255,0.2))' }} />
+          ) : (
+            <span style={{ fontSize: '3rem', zIndex: 2, position: 'relative' }}>{reward.icon}</span>
+          )
         ) : (
-          <span className={styles.badgeEmoji}>{reward.icon || '🏅'}</span>
+          <span className={styles.badgeEmoji} style={{ zIndex: 2, position: 'relative' }}>{reward.icon || '🏅'}</span>
         )}
       </div>
 
@@ -97,28 +92,24 @@ function RewardCard({ reward, userPoints, owned, onRedeem, onEquip, onUnequip, i
         </div>
 
         {owned ? (
-          isFrame ? (
-            isEquipped ? (
-              <motion.button 
-                className={styles.redeemBtn} 
-                style={{ background: 'var(--color-surface)', color: 'var(--color-text)', border: '1px solid var(--color-border)' }} 
-                onClick={onUnequip}
-                whileTap={{ scale: 0.95 }}
-              >
-                Unequip
-              </motion.button>
-            ) : (
-              <motion.button 
-                className={styles.redeemBtn} 
-                style={{ background: cfg.color, color: '#000', boxShadow: cfg.glow }} 
-                onClick={() => onEquip(reward.id)}
-                whileTap={{ scale: 0.95 }}
-              >
-                Equip
-              </motion.button>
-            )
+          isEquipped ? (
+            <motion.button 
+              className={styles.redeemBtn} 
+              style={{ background: 'var(--color-surface)', color: 'var(--color-text)', border: '1px solid var(--color-border)' }} 
+              onClick={() => onUnequip(reward.type)}
+              whileTap={{ scale: 0.95 }}
+            >
+              Unequip
+            </motion.button>
           ) : (
-            <div className={styles.ownedBadge}>✅ Unlocked</div>
+            <motion.button 
+              className={styles.redeemBtn} 
+              style={{ background: cfg.color, color: '#000', boxShadow: cfg.glow }} 
+              onClick={() => onEquip(reward.type, reward.id)}
+              whileTap={{ scale: 0.95 }}
+            >
+              Equip
+            </motion.button>
           )
         ) : (
           <motion.button
@@ -162,59 +153,62 @@ export default function Rewards() {
   const loadRewards = () => {
     setLoading(true);
     setError(null);
-    getRewards()
-      .then((fetched) => {
-        const combined = [...fetched];
-        // Filter legendary frames based on admin settings
-        const filteredFrames = HARDCODED_FRAMES.filter(frame => {
-          // If the user ALREADY OWNS the frame, ALWAYS show it so they can equip it!
-          const ownsFrame = profile?.unlockedFrames?.includes(frame.id);
-          if (ownsFrame) return true;
+    try {
+      const combined = [];
+      
+      // Add all predefined rewards from REWARDS_DB
+      REWARDS_DB.forEach(reward => {
+        // If the user ALREADY OWNS the reward, ALWAYS show it so they can equip it!
+        let ownsReward = false;
+        if (reward.type === 'frame') {
+          ownsReward = profile?.unlockedFrames?.includes(reward.id) || profile?.inventory?.frames?.includes(reward.id);
+        } else {
+          const pluralType = reward.type === 'entry' ? 'entries' : `${reward.type}s`;
+          ownsReward = profile?.inventory?.[pluralType]?.includes(reward.id);
+        }
 
-          // Otherwise, hide frames disabled in global settings
-          if (frame.id === 'frame-prime' && !settings?.primeFrameEnabled) return false; 
-          if (frame.id === 'frame-gaia' && !settings?.gaiaFrameEnabled) return false;
-          if (frame.id === 'frame-supernova' && !settings?.supernovaFrameEnabled) return false;
-          
-          return true;
-        });
-        filteredFrames.forEach(frame => {
-          if (!combined.find(r => r.id === frame.id)) {
-            combined.push(frame);
-          }
-        });
-        combined.sort((a, b) => a.pointCost - b.pointCost);
-        setRewards(combined);
-      })
-      .catch((err) => {
-        console.error('[Rewards] Failed to load:', err);
-        setError(err?.message || 'Unknown error loading rewards');
-        toast.error('Could not load rewards — check console for details');
-      })
-      .finally(() => setLoading(false));
+        let shouldShow = true;
+        // Hide reward if it is globally disabled and the user doesn't already own it
+        if (!ownsReward && settings?.disabledRewards?.includes(reward.id)) {
+          shouldShow = false;
+        }
+
+        if (shouldShow && !combined.find(r => r.id === reward.id)) {
+          combined.push(reward);
+        }
+      });
+
+      combined.sort((a, b) => a.pointCost - b.pointCost);
+      setRewards(combined);
+      setLoading(false);
+    } catch (err) {
+      console.error('[Rewards] Failed to load:', err);
+      setError('Failed to load rewards');
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
     loadRewards();
-  }, [profile?.unlockedFrames?.length, settings?.gaiaFrameEnabled, settings?.supernovaFrameEnabled, settings?.primeFrameEnabled]);
+  }, [profile?.unlockedFrames?.length, profile?.inventory, settings?.gaiaFrameEnabled, settings?.supernovaFrameEnabled, settings?.primeFrameEnabled]);
 
-  const handleEquip = async (frameId) => {
+  const handleEquip = async (type, rewardId) => {
     if (!user) return;
     try {
-      await equipFrame(user.uid, frameId);
-      toast.success('Frame equipped!');
+      await equipReward(user.uid, type, rewardId);
+      toast.success(`${type.charAt(0).toUpperCase() + type.slice(1)} equipped!`);
     } catch (err) {
-      toast.error('Failed to equip frame');
+      toast.error('Failed to equip');
     }
   };
 
-  const handleUnequip = async () => {
+  const handleUnequip = async (type) => {
     if (!user) return;
     try {
-      await unequipFrame(user.uid);
-      toast.success('Frame unequipped!');
+      await unequipReward(user.uid, type);
+      toast.success(`${type.charAt(0).toUpperCase() + type.slice(1)} unequipped!`);
     } catch (err) {
-      toast.error('Failed to unequip frame');
+      toast.error('Failed to unequip');
     }
   };
 
@@ -233,25 +227,43 @@ export default function Rewards() {
     }
   };
 
-  const ownedIds = [...(profile?.badges || []), ...(profile?.unlockedFrames || [])];
+  const checkOwned = (r) => {
+    if (r.type === 'frame') return profile?.unlockedFrames?.includes(r.id) || profile?.inventory?.frames?.includes(r.id);
+    const pluralType = r.type === 'entry' ? 'entries' : `${r.type}s`;
+    return profile?.inventory?.[pluralType]?.includes(r.id);
+  };
+
+  const checkEquipped = (r) => {
+    if (r.type === 'frame') return profile?.activeFrame === r.id || profile?.equipped?.frame === r.id;
+    return profile?.equipped?.[r.type] === r.id;
+  };
+
   const userPoints = profile?.spendableBalance ?? profile?.points ?? 0;
 
   // Filter and sort logic
   const filteredRewards = rewards.filter(r => {
-    if (activeTab === 'frames') return r.id.startsWith('frame-');
-    if (activeTab === 'badges') return !r.id.startsWith('frame-');
-    return true; // 'all'
+    if (activeTab === 'all') return true;
+    if (activeTab === 'frames') return r.type === 'frame';
+    if (activeTab === 'glows') return r.type === 'glow';
+    if (activeTab === 'companions') return r.type === 'companion';
+    if (activeTab === 'backgrounds') return r.type === 'background';
+    if (activeTab === 'entries') return r.type === 'entry';
+    return true; 
   });
 
   if (activeTab === 'all') {
     filteredRewards.sort((a, b) => {
-      const aIsFrame = a.id.startsWith('frame-');
-      const bIsFrame = b.id.startsWith('frame-');
-      if (aIsFrame && !bIsFrame) return -1;
-      if (!aIsFrame && bIsFrame) return 1;
-      return a.pointCost - b.pointCost;
+      // Prioritize frames first
+      if (a.type === 'frame' && b.type !== 'frame') return -1;
+      if (b.type === 'frame' && a.type !== 'frame') return 1;
+      
+      // For the rest, sort by cost to mix them naturally
+      if (a.pointCost !== b.pointCost) return a.pointCost - b.pointCost;
+      return a.id.localeCompare(b.id);
     });
   }
+
+  const TABS = ['all', 'frames', 'glows', 'companions', 'backgrounds', 'entries'];
 
   return (
     <div className={styles.page}>
@@ -270,14 +282,14 @@ export default function Rewards() {
         <span className={styles.headerIcon}>🎁</span>
       </div>
 
-      <div className={styles.tabsContainer}>
-        <div className={styles.tabs}>
-          {['all', 'frames', 'badges'].map((tab) => (
+      <div className={styles.tabsContainer} style={{ flexWrap: 'wrap', gap: '8px' }}>
+        <div className={styles.tabs} style={{ flexWrap: 'wrap', gap: '8px', borderBottom: 'none' }}>
+          {TABS.map((tab) => (
             <button
               key={tab}
               className={`${styles.tabBtn} ${activeTab === tab ? styles.tabActive : ''}`}
               onClick={() => setActiveTab(tab)}
-              style={{ textTransform: 'capitalize' }}
+              style={{ textTransform: 'capitalize', borderRadius: 'var(--radius-full)', border: '1px solid var(--color-border)' }}
             >
               {tab}
             </button>
@@ -286,6 +298,7 @@ export default function Rewards() {
         <button
           className={`${styles.tabBtn} ${activeTab === 'history' ? styles.tabActive : ''}`}
           onClick={() => setActiveTab('history')}
+          style={{ borderRadius: 'var(--radius-full)', border: '1px solid var(--color-border)' }}
         >
           View History 📜
         </button>
@@ -348,11 +361,11 @@ export default function Rewards() {
               key={r.id}
               reward={r}
               userPoints={userPoints}
-              owned={ownedIds.includes(r.id)}
+              owned={checkOwned(r)}
               onRedeem={handleRedeem}
               onEquip={handleEquip}
               onUnequip={handleUnequip}
-              isEquipped={profile?.activeFrame === r.id}
+              isEquipped={checkEquipped(r)}
             />
           ))}
           {filteredRewards.length === 0 && (

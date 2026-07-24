@@ -14,12 +14,18 @@ import styles from './Community.module.css';
 
 import { Heart, MessageCircle, Flag, Paperclip, X, FileText, Globe, AlertTriangle, Leaf } from 'lucide-react';
 import PremiumIcon from '../components/common/PremiumIcon';
+import { REWARDS_DB } from '../constants/rewards';
 
 function PostCard({ post, myId, myProfile }) {
   const liveUser = useUser(post.userId);
   const photoURL = liveUser ? liveUser.photoURL : post.photoURL;
   const displayName = liveUser ? liveUser.displayName : post.displayName;
   const hasLiked = post.likes?.includes(myId);
+  const equippedGlow = liveUser?.equipped?.glow;
+  const equippedCompanion = liveUser?.equipped?.companion;
+
+  const glowReward = REWARDS_DB.find(r => r.id === equippedGlow);
+  const companionReward = REWARDS_DB.find(r => r.id === equippedCompanion);
   
   const [showComments, setShowComments] = useState(false);
   const [comments, setComments] = useState([]);
@@ -94,11 +100,18 @@ function PostCard({ post, myId, myProfile }) {
     >
       <div className={styles.postHeader}>
         <Link to={`/user/${post.userId}`} style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <div className={styles.postAvatar}>
+          <div className={styles.postAvatar} style={{ position: 'relative' }}>
             <Avatar src={photoURL} activeFrame={liveUser?.activeFrame || post.activeFrame} size={40} alt={displayName} />
+            {companionReward && (
+              <div className="companion-wrapper" style={{ fontSize: '1.2rem', position: 'absolute', bottom: -5, right: -5 }}>
+                {companionReward.icon}
+              </div>
+            )}
           </div>
           <div>
-            <p className={styles.postName} style={{ color: 'var(--color-text)' }}>{displayName || 'EcoUser'}</p>
+            <p className={`${styles.postName} ${glowReward ? glowReward.cssClass : ''}`} style={{ color: glowReward ? undefined : 'var(--color-text)' }}>
+              {displayName || 'EcoUser'}
+            </p>
             <p className={styles.postTime} style={{ color: 'var(--color-text-tertiary)' }}>{timeAgo}</p>
           </div>
         </Link>

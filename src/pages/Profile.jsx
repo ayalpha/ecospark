@@ -7,8 +7,9 @@ import { compressImageToBase64 } from '../lib/imageUtils';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import Avatar from '../components/common/Avatar';
-import styles from './Profile.module.css';
 import { Settings, Edit2, Image as ImageIcon, Camera } from 'lucide-react';
+import { REWARDS_DB } from '../constants/rewards';
+import styles from './Profile.module.css';
 
 function WeeklyImpactCard({ profile }) {
   const [impact, setImpact] = useState(null);
@@ -159,11 +160,19 @@ export default function Profile() {
 
   if (!profile) return null;
 
+  const equippedGlow = profile?.equipped?.glow;
+  const equippedCompanion = profile?.equipped?.companion;
+  const equippedBg = profile?.equipped?.background;
+
+  const glowReward = REWARDS_DB.find(r => r.id === equippedGlow);
+  const companionReward = REWARDS_DB.find(r => r.id === equippedCompanion);
+  const bgReward = REWARDS_DB.find(r => r.id === equippedBg);
+
   return (
-    <div className={styles.page}>
+    <div className={`${styles.page} ${bgReward ? bgReward.cssClass : ''}`}>
       
       {/* Epic Hero Background */}
-      <div className={styles.heroBanner} />
+      <div className={styles.heroBanner} style={bgReward ? { background: 'transparent' } : undefined} />
       
       {/* Top Bar */}
       <div className={styles.topControls}>
@@ -182,7 +191,7 @@ export default function Profile() {
         {/* Floating Avatar Showcase */}
         <div className={styles.avatarShowcase}>
           <div className={styles.avatarOrbit} />
-          <div className={styles.avatarContainer} onClick={() => !uploadingPhoto && fileInputRef.current?.click()}>
+          <div className={styles.avatarContainer} onClick={() => !uploadingPhoto && fileInputRef.current?.click()} style={{ position: 'relative' }}>
             {uploadingPhoto ? (
               <span className={styles.spinner} style={{ fontSize: '32px', margin: '32px' }}>⏳</span>
             ) : (
@@ -193,10 +202,24 @@ export default function Profile() {
                 alt={profile?.displayName}
               />
             )}
+            {companionReward && (
+              <div className="companion-wrapper" style={{ 
+                position: 'absolute', 
+                bottom: -15, 
+                left: (companionReward.id === 'comp-terrabot' || companionReward.id === 'comp-waterwisp') ? -45 : undefined,
+                right: (companionReward.id === 'comp-terrabot' || companionReward.id === 'comp-waterwisp') ? undefined : -45, 
+                pointerEvents: 'none' 
+              }}>
+                {companionReward.imageUrl ? (
+                  <img src={companionReward.imageUrl} alt="companion" style={{ width: '90px', height: '90px', objectFit: 'contain', filter: 'drop-shadow(0 0 10px rgba(255,255,255,0.3))' }} />
+                ) : (
+                  <span style={{ fontSize: '2.5rem' }}>{companionReward.icon}</span>
+                )}
+              </div>
+            )}
             <div className={styles.avatarOverlay}>
               <Camera size={32} color="white" />
             </div>
-            <div className={styles.levelBadge}>{profile?.streak || 0}🔥</div>
           </div>
           <input type="file" accept="image/*" ref={fileInputRef} style={{ display: 'none' }} onChange={handlePhotoUpload} />
         </div>
@@ -229,7 +252,7 @@ export default function Profile() {
           </div>
         ) : (
           <div className={styles.identity}>
-            <h1 className={styles.profileName}>{profile?.displayName || 'EcoUser'}</h1>
+            <h1 className={`${styles.profileName} ${glowReward ? glowReward.cssClass : ''}`}>{profile?.displayName || 'EcoUser'}</h1>
             <p className={styles.profileBio}>
               {profile?.bio || (profile?.role === 'admin' ? '✨ Platform Admin' : 'Sustainability Advocate')}
             </p>
@@ -248,6 +271,19 @@ export default function Profile() {
             transition={{ delay: 0.2, duration: 0.5 }}
             className={styles.hologramStats}
           >
+            <div className={styles.holoBox}>
+              <span className={styles.holoVal}>
+                {profile?.streak || 0}
+                <motion.span 
+                  animate={{ scale: [1, 1.3, 1], rotate: [0, -10, 10, 0] }}
+                  transition={{ repeat: Infinity, duration: 1.5, ease: 'easeInOut' }}
+                  style={{ display: 'inline-block', color: '#ff6b6b', marginLeft: '6px' }}
+                >
+                  🔥
+                </motion.span>
+              </span>
+              <span className={styles.holoLabel}>Day Streak</span>
+            </div>
             <div className={styles.holoBox}>
               <span className={styles.holoVal}>{(profile?.lifetimePoints || profile?.points || 0).toLocaleString()}</span>
               <span className={styles.holoLabel}>Lifetime Pts</span>

@@ -10,5 +10,8 @@ export const useAuthStore = create((set) => ({
   setProfile: (profile) => set({ profile }),
   setLoading: (loading) => set({ loading }),
 
-  logout: () => set({ user: null, profile: null, loading: false }),
+  logout: () => {
+    sessionStorage.removeItem('entryPlayed');
+    set({ user: null, profile: null, loading: false });
+  },
 }));

@@ -9,7 +9,8 @@ import { subscribeLeaderboard } from '../services/firestoreService';
 import { useUser } from '../lib/useUser';
 import { GoldMedal, SilverMedal, BronzeMedal } from '../components/common/Medals';
 import PremiumIcon from '../components/common/PremiumIcon';
-import { Flame, Zap, Trophy, AlertTriangle, Leaf } from 'lucide-react';
+import { REWARDS_DB } from '../constants/rewards';
+import { Flame, Zap, Trophy, AlertTriangle, Leaf, ShieldAlert, BadgeInfo } from 'lucide-react';
 import styles from './Leaderboard.module.css';
 
 const RANK_STYLE = {
@@ -27,6 +28,11 @@ function LeaderboardRow({ entry, myId, index, tab }) {
   const weeklyPoints = liveUser ? liveUser.weeklyPoints : entry.weeklyPoints;
   const photoURL = liveUser ? liveUser.photoURL : entry.photoURL;
   const displayName = liveUser ? liveUser.displayName : entry.displayName;
+  const equippedGlow = liveUser?.equipped?.glow;
+  const equippedCompanion = liveUser?.equipped?.companion;
+
+  const glowReward = REWARDS_DB.find(r => r.id === equippedGlow);
+  const companionReward = REWARDS_DB.find(r => r.id === equippedCompanion);
 
   const displayValue = tab === 'streak'
     ? <><PremiumIcon icon={Flame} color="ruby" size={16} className="mr-1" /> {streak || 0} Days</>
@@ -55,18 +61,23 @@ function LeaderboardRow({ entry, myId, index, tab }) {
         </div>
 
         {/* Avatar */}
-        <div className={styles.avatar}>
+        <div className={styles.avatar} style={{ position: 'relative' }}>
           <Avatar 
             src={photoURL} 
             activeFrame={liveUser?.activeFrame || entry.activeFrame} 
             size={entry.rank === 1 ? 64 : entry.rank <= 3 ? 56 : 40} 
             alt={displayName} 
           />
+          {companionReward && (
+            <div className="companion-wrapper" style={{ fontSize: '1.2rem', position: 'absolute', bottom: -5, right: -5 }}>
+              {companionReward.icon}
+            </div>
+          )}
         </div>
 
         {/* Name */}
         <div className={styles.nameBlock}>
-          <p className={styles.name}>
+          <p className={`${styles.name} ${glowReward ? glowReward.cssClass : ''}`}>
             {displayName || 'EcoUser'}
             {isMe && <span className={styles.youBadge}>You</span>}
           </p>
@@ -90,6 +101,11 @@ function PodiumSlot({ entry, index, tab }) {
   const weeklyPoints = liveUser ? liveUser.weeklyPoints : entry.weeklyPoints;
   const photoURL = liveUser ? liveUser.photoURL : entry.photoURL;
   const displayName = liveUser ? liveUser.displayName : entry.displayName;
+  const equippedGlow = liveUser?.equipped?.glow;
+  const equippedCompanion = liveUser?.equipped?.companion;
+
+  const glowReward = REWARDS_DB.find(r => r.id === equippedGlow);
+  const companionReward = REWARDS_DB.find(r => r.id === equippedCompanion);
 
   return (
     <Link to={`/user/${entry.userId}`} style={{ textDecoration: 'none' }}>
@@ -99,13 +115,18 @@ function PodiumSlot({ entry, index, tab }) {
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: index * 0.1 }}
       >
-        <div className={styles.podiumAvatar}>
+        <div className={styles.podiumAvatar} style={{ position: 'relative' }}>
           <Avatar 
             src={photoURL} 
             activeFrame={liveUser?.activeFrame || entry.activeFrame} 
             size={index === 1 ? 72 : 56} 
             alt={displayName} 
           />
+          {companionReward && (
+            <div className="companion-wrapper" style={{ fontSize: index === 1 ? '2rem' : '1.5rem', position: 'absolute', bottom: 0, right: 0 }}>
+              {companionReward.icon}
+            </div>
+          )}
         </div>
         
         <div className={styles.podiumInfo}>
@@ -114,7 +135,9 @@ function PodiumSlot({ entry, index, tab }) {
              entry.rank === 2 ? <SilverMedal size={52} /> : 
              <BronzeMedal size={52} />}
           </div>
-          <div className={styles.podiumName}>{displayName || 'EcoUser'}</div>
+          <div className={`${styles.podiumName} ${glowReward ? glowReward.cssClass : ''}`}>
+            {displayName || 'EcoUser'}
+          </div>
           <div className={styles.podiumPts}>
             {tab === 'streak'
               ? <span style={{display:'flex', alignItems:'center', gap:'4px', justifyContent:'center'}}><PremiumIcon icon={Flame} color="ruby" size={14} /> {streak || 0} Days</span>

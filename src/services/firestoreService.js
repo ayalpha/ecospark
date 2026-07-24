@@ -58,6 +58,20 @@ export async function createUserProfile(uid, data) {
     totalCO2Saved: 0,
     totalWaterSaved: 0,
     totalWasteSaved: 0,
+    inventory: {
+      frames: [],
+      glows: [],
+      companions: [],
+      backgrounds: [],
+      entries: []
+    },
+    equipped: {
+      frame: null,
+      glow: null,
+      companion: null,
+      background: null,
+      entry: null
+    },
     notificationsEnabled: true,
     theme: 'midnight',
     textSize: 'normal',
@@ -77,7 +91,17 @@ export async function getUserProfile(uid) {
 
 export function subscribeUserProfile(uid, callback) {
   return onSnapshot(doc(db, 'users', uid), (snap) => {
-    callback(snap.exists() ? { id: snap.id, ...snap.data() } : null);
+    if (!snap.exists()) {
+      callback(null);
+      return;
+    }
+    const data = snap.data();
+    callback({
+      id: snap.id,
+      ...data,
+      inventory: data.inventory || { frames: [], glows: [], companions: [], backgrounds: [], entries: [] },
+      equipped: data.equipped || { frame: null, glow: null, companion: null, background: null, entry: null },
+    });
   });
 }
 
@@ -337,6 +361,8 @@ export async function getPublicProfile(userId) {
     followersCount: data.followersCount || 0,
     followingCount: data.followingCount || 0,
     blockedUsers: data.blockedUsers || [],
+    inventory: data.inventory || { frames: [], glows: [], companions: [], backgrounds: [], entries: [] },
+    equipped: data.equipped || { frame: null, glow: null, companion: null, background: null, entry: null },
     createdAt: data.createdAt,
     lastActivityDate: data.lastActivityDate || null,
   };
@@ -371,11 +397,19 @@ export async function redeemReward(userId, rewardId, pointCost) {
     const balance = user.spendableBalance ?? user.points ?? 0;
     if (balance < pointCost) throw new Error('Insufficient points');
 
-    const isFrame = rewardId.startsWith('frame-');
+    let typeKey;
+    if (rewardId.startsWith('frame-')) typeKey = 'frames';
+    else if (rewardId.startsWith('glow-')) typeKey = 'glows';
+    else if (rewardId.startsWith('comp-')) typeKey = 'companions';
+    else if (rewardId.startsWith('bg-')) typeKey = 'backgrounds';
+    else if (rewardId.startsWith('entry-')) typeKey = 'entries';
+    else typeKey = 'misc';
+
+    const isFrame = typeKey === 'frames';
 
     tx.update(userRef, {
       spendableBalance: increment(-pointCost),
-      [isFrame ? 'unlockedFrames' : 'badges']: arrayUnion(rewardId),
+      [isFrame ? 'unlockedFrames' : `inventory.${typeKey}`]: arrayUnion(rewardId),
       updatedAt: serverTimestamp(),
     });
 
@@ -398,39 +432,43 @@ export async function redeemReward(userId, rewardId, pointCost) {
   });
 }
 
-export async function equipFrame(userId, frameId) {
+export async function equipReward(userId, type, rewardId) {
   const userRef = doc(db, 'users', userId);
   const lbRef = doc(db, 'leaderboard', userId);
   
-  await updateDoc(userRef, {
-    activeFrame: frameId,
-    updatedAt: serverTimestamp(),
-  });
+  const updateData = { updatedAt: serverTimestamp() };
+  if (type === 'frame') {
+    updateData.activeFrame = rewardId;
+    updateData['equipped.frame'] = rewardId;
+  } else {
+    updateData[`equipped.${type}`] = rewardId;
+  }
+
+  await updateDoc(userRef, updateData);
   
   try {
-    await updateDoc(lbRef, {
-      activeFrame: frameId,
-      updatedAt: serverTimestamp(),
-    });
+    await updateDoc(lbRef, updateData);
   } catch {
     // Leaderboard doc might not exist yet, that's fine
   }
 }
 
-export async function unequipFrame(userId) {
+export async function unequipReward(userId, type) {
   const userRef = doc(db, 'users', userId);
   const lbRef = doc(db, 'leaderboard', userId);
   
-  await updateDoc(userRef, {
-    activeFrame: null,
-    updatedAt: serverTimestamp(),
-  });
+  const updateData = { updatedAt: serverTimestamp() };
+  if (type === 'frame') {
+    updateData.activeFrame = null;
+    updateData['equipped.frame'] = null;
+  } else {
+    updateData[`equipped.${type}`] = null;
+  }
+
+  await updateDoc(userRef, updateData);
   
   try {
-    await updateDoc(lbRef, {
-      activeFrame: null,
-      updatedAt: serverTimestamp(),
-    });
+    await updateDoc(lbRef, updateData);
   } catch {
     // Leaderboard doc might not exist yet
   }

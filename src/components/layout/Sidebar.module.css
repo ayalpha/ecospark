@@ -4,8 +4,8 @@
   display: none; /* Hidden on mobile */
   position: fixed;
   top: 0;
+  bottom: 0;
   left: 0;
-  height: 100vh;
   width: var(--sidebar-collapsed);
   background: var(--glass-bg);
   backdrop-filter: var(--glass-blur);

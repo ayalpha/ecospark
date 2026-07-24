@@ -74,7 +74,7 @@
 .avatarContainer {
   position: relative;
   margin-top: -80px;
-  margin-bottom: 16px;
+  margin-bottom: 32px;
   filter: drop-shadow(0 12px 24px rgba(0,0,0,0.4));
 }
 

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useAuthStore } from '../store/authStore';
 import { getFlaggedSubmissions, updateSubmissionStatus, awardPointsAndUpdateStreak, resolveReport, getTasks, getRewards, createNotification } from '../services/firestoreService';
-import { getAdminUsers, adminUpdateUserPoints, adminAwardFrame, adminBanUser, adminDeletePost, getReportedPosts, getAdminStats, getAdminChartData, getResolvedSubmissions, adminDeleteSubmission, adminCreateTask, adminUpdateTask, adminDeleteTask, adminCreateReward, adminUpdateReward, adminDeleteReward, getGlobalSettings, updateGlobalSettings, getFrameRequests, resolveFrameRequest } from '../services/adminService';
+import { getAdminUsers, adminUpdateUserPoints, adminUpdateUserProfile, adminAwardFrame, adminBanUser, adminDeletePost, getReportedPosts, getAdminStats, getAdminChartData, getResolvedSubmissions, adminDeleteSubmission, adminCreateTask, adminUpdateTask, adminDeleteTask, adminCreateReward, adminUpdateReward, adminDeleteReward, getGlobalSettings, updateGlobalSettings, getFrameRequests, resolveFrameRequest } from '../services/adminService';
 import { sendPasswordResetEmail } from 'firebase/auth';
 import { auth } from '../lib/firebase';
 import { Navigate } from 'react-router-dom';
@@ -11,7 +11,7 @@ import styles from './Admin.module.css';
 import { FileText, Shield, Users, Globe, Leaf, Ban, CheckSquare, Sparkles, XCircle, AlertTriangle, Trash2, Inbox, Crown, Diamond, Medal, Save } from 'lucide-react';
 import PremiumIcon from '../components/common/PremiumIcon';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-
+import { REWARDS_DB } from '../constants/rewards';
 const TABS = [
   { id: 'overview', label: 'Overview' },
   { id: 'users', label: 'Users' },
@@ -19,8 +19,7 @@ const TABS = [
   { id: 'reports', label: 'Reported Posts' },
   { id: 'past', label: 'Past Submissions' },
   { id: 'tasks', label: 'Tasks' },
-  { id: 'rewards', label: 'Rewards' },
-  { id: 'frames', label: 'Frames' },
+  { id: 'reward-toggles', label: 'Reward Toggles' },
   { id: 'settings', label: 'Settings' }
 ];
 
@@ -45,6 +44,7 @@ export default function Admin() {
 
   // Modals
   const [pointsModal, setPointsModal] = useState({ open: false, user: null, amount: 0 });
+  const [editUserModal, setEditUserModal] = useState({ open: false, user: null, name: '' });
   const [frameModal, setFrameModal] = useState({ open: false, user: null, frameId: 'frame-god' });
   const [directAward, setDirectAward] = useState({ userId: '', frameId: 'frame-prime' });
   const [taskModal, setTaskModal] = useState({ open: false, task: null });
@@ -85,12 +85,9 @@ export default function Admin() {
       } else if (tab === 'tasks') {
         const t = await getTasks();
         setTasksData(t);
-      } else if (tab === 'rewards') {
-        const r = await getRewards();
-        setRewardsData(r);
-      } else if (tab === 'frames' || tab === 'settings') {
+      } else if (tab === 'reward-toggles' || tab === 'settings') {
         const setg = await getGlobalSettings();
-        setSettingsData(setg);
+        setSettingsData(setg || {});
       }
     } catch (err) {
       toast.error(err.message || 'Failed to load data');
@@ -137,6 +134,22 @@ export default function Admin() {
   };
 
   // --- Users Logic ---
+  const handleEditUserSubmit = async (e) => {
+    e.preventDefault();
+    if (!editUserModal.name.trim()) {
+      toast.error('Name cannot be empty');
+      return;
+    }
+    try {
+      await adminUpdateUserProfile(editUserModal.user.id, { displayName: editUserModal.name });
+      toast.success('User profile updated successfully!');
+      setEditUserModal({ open: false, user: null, name: '' });
+      loadTabData('users');
+    } catch (err) {
+      toast.error(err.message || 'Failed to update user profile');
+    }
+  };
+
   const handleUpdatePoints = async () => {
     try {
       await adminUpdateUserPoints(pointsModal.user.id, Number(pointsModal.amount));
@@ -371,10 +384,11 @@ export default function Admin() {
                     <tr key={user.id} style={{ opacity: user.banned ? 0.5 : 1 }}>
                       <td>{user.displayName}</td>
                       <td>{user.email || 'N/A'}</td>
-                      <td>{user.points || 0}</td>
+                      <td>{user.spendableBalance ?? user.points ?? 0}</td>
                       <td>{user.role || 'user'}</td>
                       <td>{user.banned ? <><PremiumIcon icon={Ban} color="ruby" size={16} /> Banned</> : <><PremiumIcon icon={CheckSquare} color="emerald" size={16} /> Active</>}</td>
                       <td className={styles.actionCell}>
+                        <button className={styles.btnSm} onClick={() => setEditUserModal({ open: true, user, name: user.displayName || '' })}>Edit Profile</button>
                         <button className={styles.btnSm} onClick={() => setPointsModal({ open: true, user, amount: 0 })}>Points</button>
                         <button className={styles.btnSm} onClick={() => handleResetPassword(user.email)}>Reset Pwd</button>
                         <button 
@@ -608,103 +622,64 @@ export default function Admin() {
             </div>
           )}
 
-          {/* TAB 7: REWARDS MANAGER */}
-          {activeTab === 'rewards' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                <button 
-                  className={styles.approveBtn} 
-                  style={{ width: 'auto', padding: '10px 20px' }}
-                  onClick={() => setRewardModal({ open: true, reward: { name: '', description: '', icon: '', pointCost: 100, tier: 'bronze' }})}
-                >
-                  + Add New Reward
-                </button>
-              </div>
-              <div className={styles.tableContainer}>
-                <table className={styles.table}>
-                  <thead>
-                    <tr>
-                      <th>Icon</th>
-                      <th>Name</th>
-                      <th>Cost</th>
-                      <th>Tier</th>
-                      <th>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {rewardsData.map(r => (
-                      <tr key={r.id}>
-                        <td style={{ fontSize: '24px' }}>{r.icon}</td>
-                        <td>{r.name}</td>
-                        <td>{r.pointCost}</td>
-                        <td style={{ textTransform: 'capitalize' }}>{r.tier}</td>
-                        <td className={styles.actionCell}>
-                          <button className={styles.btnSm} onClick={() => setRewardModal({ open: true, reward: r })}>Edit</button>
-                          <button className={`${styles.btnSm} ${styles.danger}`} onClick={() => handleDeleteReward(r.id)}>Delete</button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-
-          {/* TAB 8: FRAMES (Settings, Direct Award & Requests) */}
-          {activeTab === 'frames' && (
+          {/* TAB 8: REWARD TOGGLES */}
+          {activeTab === 'reward-toggles' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '30px' }}>
-              
-              {/* Legendary Frame Settings */}
               {settingsData && (
                 <div className={styles.chartCard} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div>
-                      <h3 className={styles.chartTitle} style={{ margin: 0 }}>Legendary Frame Visibility</h3>
-                      <p style={{ margin: '4px 0 0 0', color: 'var(--color-text-secondary)', fontSize: 'var(--text-sm)' }}>Toggle whether legendary frames appear in the Rewards shop.</p>
-                    </div>
-                    <button onClick={handleSaveSettings} className={styles.approveBtn} style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div>
+                    <h3 className={styles.chartTitle} style={{ margin: 0 }}>Reward Visibility Toggles</h3>
+                    <p style={{ margin: '4px 0 0 0', color: 'var(--color-text-secondary)', fontSize: 'var(--text-sm)' }}>Enable or disable specific rewards. Disabled rewards won't appear in the shop.</p>
+                  </div>
+
+                  {['frame', 'glow', 'companion', 'background', 'entry'].map(type => {
+                    const categoryRewards = REWARDS_DB.filter(r => r.type === type);
+                    if (categoryRewards.length === 0) return null;
+                    const typeLabel = type === 'frame' ? 'Frames' : type === 'glow' ? 'Name Glows' : type === 'companion' ? 'Companions' : type === 'background' ? 'Backgrounds' : 'App Entry Animations';
+                    return (
+                      <div key={type} style={{ marginTop: '16px' }}>
+                        <h4 style={{ color: 'var(--color-text)', textTransform: 'uppercase', fontSize: '12px', letterSpacing: '1px', borderBottom: '1px solid var(--color-border)', paddingBottom: '8px', marginBottom: '12px' }}>{typeLabel}</h4>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '12px' }}>
+                          {categoryRewards.map(reward => {
+                            const isDisabled = settingsData.disabledRewards?.includes(reward.id);
+                            return (
+                              <div key={reward.id} className={styles.inputGroup} style={{ background: 'var(--color-surface-hover)', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--color-border)' }}>
+                                <label style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: 'var(--text-sm)', color: 'var(--color-text)', cursor: 'pointer', margin: 0 }}>
+                                  <input 
+                                    type="checkbox" 
+                                    checked={!isDisabled} 
+                                    onChange={e => {
+                                      const currentDisabled = settingsData.disabledRewards || [];
+                                      let newDisabled;
+                                      if (!e.target.checked) {
+                                        newDisabled = [...currentDisabled, reward.id];
+                                      } else {
+                                        newDisabled = currentDisabled.filter(id => id !== reward.id);
+                                      }
+                                      setSettingsData({...settingsData, disabledRewards: newDisabled});
+                                    }}
+                                    style={{ width: '16px', height: '16px' }}
+                                  />
+                                  <span style={{ fontSize: '18px' }}>{reward.icon || '🏅'}</span>
+                                  <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                    <span style={{ fontWeight: 600, fontSize: '14px' }}>{reward.name}</span>
+                                  </div>
+                                </label>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+                  
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '24px', borderTop: '1px solid var(--color-border)', paddingTop: '20px' }}>
+                    <button onClick={handleSaveSettings} className={styles.approveBtn} style={{ padding: '10px 24px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                       <PremiumIcon icon={Save} color="white" size={16} /> Save Settings
                     </button>
                   </div>
-
-                  <div className={styles.inputGroup}>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: 'var(--text-base)', color: 'var(--color-text)' }}>
-                      <input 
-                        type="checkbox" 
-                        checked={settingsData.gaiaFrameEnabled ?? false} 
-                        onChange={e => setSettingsData({...settingsData, gaiaFrameEnabled: e.target.checked})}
-                        style={{ width: '20px', height: '20px' }}
-                      />
-                      🌿 Enable Gaia Crown Frame (25,000 pts)
-                    </label>
-                  </div>
-
-                  <div className={styles.inputGroup}>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: 'var(--text-base)', color: 'var(--color-text)' }}>
-                      <input 
-                        type="checkbox" 
-                        checked={settingsData.supernovaFrameEnabled ?? false} 
-                        onChange={e => setSettingsData({...settingsData, supernovaFrameEnabled: e.target.checked})}
-                        style={{ width: '20px', height: '20px' }}
-                      />
-                      🌌 Enable Supernova Frame (50,000 pts)
-                    </label>
-                  </div>
-
-                  <div className={styles.inputGroup}>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: 'var(--text-base)', color: 'var(--color-text)' }}>
-                      <input 
-                        type="checkbox" 
-                        checked={settingsData.primeFrameEnabled ?? false} 
-                        onChange={e => setSettingsData({...settingsData, primeFrameEnabled: e.target.checked})}
-                        style={{ width: '20px', height: '20px' }}
-                      />
-                      ✨ Enable Prime Frame (999,999 pts)
-                    </label>
-                  </div>
                 </div>
               )}
-
             </div>
           )}
 
@@ -777,6 +752,31 @@ export default function Admin() {
               <button className={styles.btnSm} onClick={() => setPointsModal({ open: false, user: null, amount: 0 })}>Cancel</button>
               <button className={`${styles.btnSm} ${styles.approveBtn}`} style={{flex: 0}} onClick={handleUpdatePoints}>Save</button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit User Modal */}
+      {editUserModal.open && editUserModal.user && (
+        <div className={styles.modalOverlay}>
+          <div className={styles.modalContent}>
+            <h3>Edit Profile for {editUserModal.user.email}</h3>
+            <form onSubmit={handleEditUserSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginTop: '16px' }}>
+              <div className={styles.inputGroup}>
+                <label>Display Name</label>
+                <input 
+                  type="text" 
+                  value={editUserModal.name} 
+                  onChange={(e) => setEditUserModal({ ...editUserModal, name: e.target.value })}
+                  placeholder="Enter user's new name"
+                  style={{ padding: '10px', background: 'var(--color-bg-card)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-sm)', color: 'var(--color-text)' }}
+                />
+              </div>
+              <div className={styles.modalActions}>
+                <button type="button" className={styles.btnSm} onClick={() => setEditUserModal({ open: false, user: null, name: '' })}>Cancel</button>
+                <button type="submit" className={`${styles.btnSm} ${styles.approveBtn}`} style={{flex: 0}}>Save</button>
+              </div>
+            </form>
           </div>
         </div>
       )}

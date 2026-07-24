@@ -7,6 +7,7 @@ import BottomTabBar from './BottomTabBar';
 import OfflineBanner from '../common/OfflineBanner';
 import StreakRiskBanner from '../common/StreakRiskBanner';
 import AICoachWidget from '../coach/AICoachWidget';
+import AppEntryAnimation from '../common/AppEntryAnimation';
 import styles from './AppShell.module.css';
 
 export default function AppShell({ children }) {
@@ -47,6 +48,9 @@ export default function AppShell({ children }) {
 
       {/* AI Coach FAB — mounted once at app shell level */}
       <AICoachWidget />
+
+      {/* App Entry Animations */}
+      <AppEntryAnimation />
     </div>
   );
 }

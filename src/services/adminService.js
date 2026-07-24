@@ -11,6 +11,15 @@ export async function getAdminUsers() {
   });
 }
 
+export async function adminUpdateUserProfile(userId, updates) {
+  const userRef = doc(db, 'users', userId);
+  await updateDoc(userRef, {
+    ...updates,
+    updatedAt: serverTimestamp()
+  });
+  return { success: true };
+}
+
 export async function adminUpdateUserPoints(userId, pointsToAdd) {
   const userRef = doc(db, 'users', userId);
   await updateDoc(userRef, {
