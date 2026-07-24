@@ -547,6 +547,12 @@ export default function Admin() {
                       <p className={styles.cardReason}>
                         <strong>User ID:</strong> <span style={{ fontSize: '10px' }}>{sub.userId}</span>
                       </p>
+                      <p className={styles.cardReason}>
+                        <strong>AI reasoning:</strong> {sub.reason || 'No reasoning provided'}
+                      </p>
+                      {sub.confidence != null && (
+                        <p className={styles.cardConf}>Confidence: {Math.round(sub.confidence * 100)}%</p>
+                      )}
                     </div>
                     <div className={styles.cardActions}>
                       <button 

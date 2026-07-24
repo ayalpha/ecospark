@@ -98,42 +98,27 @@ export function streamCoachReply(messages, onToken, onDone, onError) {
  * @param {string} taskPrompt - Human-readable description of what to verify
  */
 export async function verifyTaskPhoto(submissionId, imageUrl, taskPrompt) {
-  const controller = new AbortController();
-  // 15-second timeout for the initial HTTP response (not the full AI call)
-  const timeout = setTimeout(() => controller.abort(), 15000);
-
-  try {
-    const response = await fetch(`${BASE_URL}/api/verify`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ submissionId, imageUrl, taskPrompt }),
-      signal: controller.signal,
-    });
-
-    if (!response.ok) {
-      const err = await response.json().catch(() => ({ error: 'Unknown error' }));
-      throw new Error(err.error || `Verify API error: ${response.status}`);
-    }
-
-    return await response.json(); // { submissionId, status: 'pending' }
-  } catch (err) {
-    if (err.name === 'AbortError') throw err;
-    console.warn('[verifyTaskPhoto] Backend unreachable. Falling back to client-side verification.', err);
-    // Fallback to client-side verification for local development without Vercel API
-    await performClientSideVerification(submissionId, imageUrl, taskPrompt);
-  } finally {
-    clearTimeout(timeout);
-  }
+  // We completely bypass the Vercel backend for AI verification to avoid the 10-second timeout limit.
+  // Verification runs entirely in the user's browser, which has no strict timeout.
+  await performClientSideVerification(submissionId, imageUrl, taskPrompt);
 }
 
-// Client-side fallback for AI verification (used when local API server is not running)
+// Client-side AI verification
 async function performClientSideVerification(submissionId, imageUrl, taskPrompt) {
   const { GoogleGenerativeAI } = await import('@google/generative-ai');
   const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-  if (!apiKey) throw new Error('VITE_GEMINI_API_KEY missing for client-side fallback');
+
+  if (!apiKey) {
+    console.error('VITE_GEMINI_API_KEY missing for client-side fallback');
+    const { updateSubmissionStatus } = await import('./firestoreService');
+    await updateSubmissionStatus(submissionId, 'flagged', {
+      reason: 'AI Verification failed: API key missing on Vercel.',
+    });
+    return;
+  }
 
   const genAI = new GoogleGenerativeAI(apiKey);
-  const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+  const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
   try {
     let imagePart;
@@ -143,7 +128,6 @@ async function performClientSideVerification(submissionId, imageUrl, taskPrompt)
     } else {
       const resp = await fetch(imageUrl);
       const buffer = await resp.arrayBuffer();
-      // Using btoa for client-side base64 conversion
       const base64 = btoa(new Uint8Array(buffer).reduce((data, byte) => data + String.fromCharCode(byte), ''));
       imagePart = { inlineData: { data: base64, mimeType: resp.headers.get('content-type') || 'image/jpeg' } };
     }
@@ -152,7 +136,7 @@ async function performClientSideVerification(submissionId, imageUrl, taskPrompt)
 The student claims they completed this action: "${taskPrompt}"
 Please evaluate whether the photo shows reasonable evidence of this eco-friendly action being performed or completed.
 
-Be EXTREMELY LENIENT. Give the student the maximum benefit of the doubt.
+Be LENIENT. Give the student the maximum benefit of the doubt.
 - Accept poor lighting, blur, weird angles, or partial framing.
 - Accept indirect evidence (e.g. holding a reusable bottle, standing near a bin, turning off a light switch).
 - Do not expect a perfect, staged photo. Real-world photos are messy.
@@ -166,7 +150,24 @@ Respond with a confidence score where:
 Respond ONLY with a JSON object like this (no markdown, no extra text):
 {"approved": true/false, "confidence": 0.0-1.0, "reason": "one sentence explanation"}`;
 
-    const result = await model.generateContent([{ text: verificationPrompt }, imagePart]);
+    // Add a retry loop to handle 503 High Demand errors from Gemini
+    let result;
+    let retries = 3;
+    while (retries > 0) {
+      try {
+        result = await model.generateContent([{ text: verificationPrompt }, imagePart]);
+        break; // Success!
+      } catch (err) {
+        if ((err.status === 503 || err.message?.includes('503')) && retries > 1) {
+          console.warn(`Gemini 503 Error. Retrying... (${retries - 1} left)`);
+          await new Promise(r => setTimeout(r, 3000)); // wait 3 seconds before retry
+          retries--;
+        } else {
+          throw err;
+        }
+      }
+    }
+
     const text = result.response.text().trim();
     const jsonStr = text.replace(/```json?\n?/g, '').replace(/```/g, '').trim();
     const aiResult = JSON.parse(jsonStr);
@@ -176,17 +177,23 @@ Respond ONLY with a JSON object like this (no markdown, no extra text):
 
     const { updateSubmissionStatus } = await import('./firestoreService');
     await updateSubmissionStatus(submissionId, status, {
-      aiVerdict: confidence >= 0.4,
+      aiVerdict: confidence >= 0.7,
       confidence,
       reason: aiResult.reason || 'Client-side verification completed',
-      needsAudit: confidence >= 0.4 && confidence < 0.7
     });
-  } catch (fallbackErr) {
-    console.error('[performClientSideVerification] Error:', fallbackErr);
-    const { updateSubmissionStatus } = await import('./firestoreService');
-    await updateSubmissionStatus(submissionId, 'flagged', {
-      reason: 'AI Verification fallback failed: ' + fallbackErr.message
-    });
+  } catch (err) {
+    console.error('Client-side AI verification failed:', err);
+
+    // If it STILL fails after 3 retries (or due to invalid API key/internet issues),
+    // we flag it for manual teacher review. No fake auto-approvals!
+    try {
+      const { updateSubmissionStatus } = await import('./firestoreService');
+      await updateSubmissionStatus(submissionId, 'flagged', {
+        reason: 'AI Verification failed after retries: ' + err.message,
+      });
+    } catch (finalErr) {
+      console.error('Failed to flag submission:', finalErr);
+    }
   }
 }
 
@@ -195,16 +202,21 @@ Respond ONLY with a JSON object like this (no markdown, no extra text):
  * @param {string} completedTaskContext - Context about the just completed task
  * @returns {Promise<Object>} - The generated task object
  */
-export async function generateTaskAI(completedTaskContext, attempt = 1) {
+export async function generateTaskAI(completedTaskContext, existingTaskTitles = [], attempt = 1) {
   try {
     const apiKey = import.meta.env.VITE_GROQ_API_KEY;
     if (!apiKey) throw new Error('Groq API key missing');
+
+    const avoidList = existingTaskTitles.length > 0
+      ? `\n\nCRITICAL: You MUST NOT generate any task similar to these existing tasks on the board:\n${existingTaskTitles.map(t => `- "${t}"`).join('\n')}\nIf you repeat any of these ideas, you fail.`
+      : '';
 
     const systemPrompt = {
       role: 'system',
       content: `You are an AI that generates eco-friendly sustainability tasks for a gamified app.
 The user just completed a task. You must generate 1 NEW, COMPLETELY UNIQUE, and HIGHLY SPECIFIC task.
-CRITICAL RULE: The new task MUST BE ENTIRELY DIFFERENT from the recently completed task. Pick a completely different topic (e.g., if they did lighting, do NOT suggest bulbs; suggest composting, vegan meals, biking, planting, etc.). Be highly creative.
+CRITICAL RULE: The new task MUST BE ENTIRELY DIFFERENT from the recently completed task. Pick a completely different topic (e.g., if they did lighting, do NOT suggest bulbs; suggest composting, vegan meals, biking, planting, etc.). Be highly creative.${avoidList}
+
 Respond ONLY with a valid JSON object matching exactly this schema:
 {"title":"Short catchy title","description":"1-2 sentences explaining what to do","category":"energy","points":25,"co2":50,"water":0,"verificationPrompt":"Instructions for what photo to take"}
 The category must be one of: energy, water, waste, food, transport, nature, community.
@@ -236,9 +248,9 @@ Do NOT include any extra text, only the JSON object.`
 
     const data = await response.json();
     const content = data.choices?.[0]?.message?.content;
-    
+
     if (!content) throw new Error('No content from AI');
-    
+
     // Parse to ensure it's valid JSON
     const parsed = JSON.parse(content);
     if (!parsed.title || !parsed.description) {

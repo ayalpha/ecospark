@@ -132,6 +132,7 @@ function Countdown({ expiresAt }) {
 
 export default function Tasks() {
   const { profile } = useAuthStore();
+  const [allGlobalTasks, setAllGlobalTasks] = useState([]);
   const [tasks, setTasks] = useState([]);
   const [submissions, setSubmissions] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -152,23 +153,13 @@ export default function Tasks() {
       getUserSubmissions(profile.id, 50),
     ])
       .then(([t, s]) => { 
-        // 1. Shuffle tasks deterministically for the day
-        const rand = mulberry32(getDailySeed(profile.id));
-        const shuffled = [...t].sort(() => rand() - 0.5);
-        
-        // 2. Inject a daily bonus task
-        const bonusTask = {
-          id: `bonus-${getDailySeed(profile.id)}`,
-          title: 'Daily Bonus Challenge!',
-          description: 'A special high-value task available only for today.',
-          category: 'community',
-          points: 150,
-          co2: 50,
-          verificationPrompt: 'Show evidence of doing something exceptionally green today!',
-          expiresAt: new Date().setHours(23, 59, 59, 999), // End of today
-        };
-        
-        setTasks([bonusTask, ...shuffled]); 
+        // 1. Sort ALL tasks by creation time so they unlock in a predictable global order
+        const allSorted = [...t].sort((a, b) => {
+          const timeA = a.createdAt?.toMillis ? a.createdAt.toMillis() : 0;
+          const timeB = b.createdAt?.toMillis ? b.createdAt.toMillis() : 0;
+          return timeA - timeB;
+        });
+        setAllGlobalTasks(allSorted);
         setSubmissions(s); 
       })
       .catch((err) => {
@@ -182,6 +173,32 @@ export default function Tasks() {
   useEffect(() => {
     loadData();
   }, [profile?.id]);
+
+  useEffect(() => {
+    if (!allGlobalTasks.length || !profile) return;
+    
+    // The user unlocks 1 new task from the global pool for every task they complete!
+    // Base starter tasks are 14.
+    const unlockedCount = 14 + (profile.totalTasksCompleted || 0);
+    const allowedTasks = allGlobalTasks.slice(0, unlockedCount);
+
+    // Shuffle deterministically for the day
+    const rand = mulberry32(getDailySeed(profile.id));
+    const shuffled = [...allowedTasks].sort(() => rand() - 0.5);
+    
+    const bonusTask = {
+      id: `bonus-${getDailySeed(profile.id)}`,
+      title: 'Daily Bonus Challenge!',
+      description: 'A special high-value task available only for today.',
+      category: 'community',
+      points: 150,
+      co2: 50,
+      verificationPrompt: 'Show evidence of doing something exceptionally green today!',
+      expiresAt: new Date().setHours(23, 59, 59, 999),
+    };
+    
+    setTasks([bonusTask, ...shuffled]);
+  }, [allGlobalTasks, profile?.totalTasksCompleted]);
 
   const categories = ['all', ...new Set(tasks.map((t) => t.category))];
 
@@ -321,21 +338,31 @@ export default function Tasks() {
             onSuccess={(sub) => {
               setSubmissions((prev) => [sub, ...prev]);
               
-              // Trigger autonomous AI task generation in the background
-              const taskContext = selectedTask.title;
-              setSelectedTask(null);
+              // Only generate a new task if the global pool is exhausted for this user!
+              const expectedUnlocked = 14 + (profile.totalTasksCompleted || 0) + 1; // +1 because profile state updates async
+              
+              if (expectedUnlocked > allGlobalTasks.length) {
+                // Global pool is empty for them! Time for the AI to expand the world's tasks!
+                const taskContext = selectedTask.title;
+                const existingTitles = allGlobalTasks.map(t => t.title);
+                setSelectedTask(null);
 
-              toast.promise(
-                generateTaskAI(taskContext).then(async (newTaskData) => {
-                  const newId = await createTask(newTaskData);
-                  setTasks(prev => [...prev, { id: newId, ...newTaskData }]);
-                }),
-                {
-                  loading: '🌱 AI is generating a new task...',
-                  success: 'New task added to your board!',
-                  error: 'Failed to generate task.'
-                }
-              );
+                toast.promise(
+                  generateTaskAI(taskContext, existingTitles).then(async (newTaskData) => {
+                    const taskToSave = { ...newTaskData, isAIGenerated: true };
+                    const newId = await createTask(taskToSave);
+                    setAllGlobalTasks(prev => [...prev, { id: newId, ...taskToSave, createdAt: { toMillis: () => Date.now() } }]);
+                  }),
+                  {
+                    loading: '🌱 AI is expanding the global task pool...',
+                    success: 'New global task created!',
+                    error: 'Failed to generate task.'
+                  }
+                );
+              } else {
+                toast.success('Task logged! A new task has been unlocked from the global pool.');
+                setSelectedTask(null);
+              }
             }}
           />
         )}
