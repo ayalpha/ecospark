@@ -2,7 +2,7 @@
 
 **Gamified Sustainability Habit Tracker for Students**
 
-Built to Awwwards-caliber standards on 100% free-tier infrastructure. No paid APIs, no credit cards required.
+Built to Awwwards-caliber standards on free-tier infrastructure. No paid APIs, no CCs required.
 
 ---
 
@@ -12,11 +12,11 @@ Built to Awwwards-caliber standards on 100% free-tier infrastructure. No paid AP
 |---|---|
 | Frontend | React 18 + Vite + Framer Motion |
 | 3D Hero | react-three-fiber + @react-three/drei + postprocessing |
-| Auth + DB + Storage | Firebase (Spark/free plan) |
-| Hosting | Vercel (free tier) |
+| Auth + DB + Storage | Firebase (Spark plan) |
+| Hosting | Vercel |
 | AI Coach | Groq API — `llama-3.3-70b-versatile` (free, streaming) |
-| AI Photo Verify | Google Gemini API — `gemini-2.5-flash` (free) |
-| News | GNews.io (free tier) |
+| AI Photo Verify | Google Gemini API — `gemini-2.5-flash` |
+| News | GNews.io |
 
 ---
 
