@@ -3,6 +3,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
+import { Analytics } from '@vercel/analytics/react';
 import App from './App';
 import ErrorBoundary from './components/common/ErrorBoundary';
 import './app.css';
@@ -33,6 +34,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
             },
           }}
         />
+        <Analytics />
       </BrowserRouter>
     </ErrorBoundary>
   </React.StrictMode>
