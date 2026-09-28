@@ -1,0 +1,290 @@
+/* src/components/dashboard/widgets.module.css */
+
+.widget {
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: var(--glass-border);
+  border-radius: var(--card-radius);
+  box-shadow: var(--elevation-2);
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.widgetHead {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.widgetIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  background: rgba(148, 180, 200, 0.06);
+  border: 1px solid var(--color-border);
+}
+
+.widgetTitle {
+  font-size: var(--text-sm);
+  font-weight: 700;
+  color: var(--color-text);
+  letter-spacing: 0.01em;
+  flex: 1;
+}
+
+.widgetLink {
+  display: flex;
+  align-items: center;
+  color: var(--color-text-tertiary);
+  transition: color 0.2s ease, transform 0.2s ease;
+}
+
+.widgetLink:hover {
+  color: var(--color-primary-light);
+  transform: translateX(2px);
+}
+
+/* ── Next Unlock ─────────────────────────────────────────── */
+
+.unlockBody {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.unlockName {
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  font-weight: 700;
+  color: var(--color-text);
+  margin: 0;
+  line-height: 1.2;
+}
+
+.unlockTier {
+  margin: 3px 0 0;
+  font-size: var(--text-xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.unlockIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 12px;
+  font-size: 22px;
+  background: var(--color-surface);
+  border: 1px solid;
+  flex-shrink: 0;
+}
+
+.progressTrack {
+  height: 7px;
+  border-radius: 99px;
+  background: var(--color-surface-raised);
+  overflow: hidden;
+}
+
+.progressFill {
+  height: 100%;
+  border-radius: 99px;
+  background: var(--accent-gradient, linear-gradient(90deg, #22d3ee, #2dd4a7));
+  box-shadow: 0 0 12px rgba(45, 212, 167, 0.45);
+}
+
+.unlockFootnote {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+}
+
+.unlockFootnote strong {
+  color: var(--color-text);
+}
+
+.ready {
+  color: var(--color-success);
+  font-weight: 700;
+}
+
+/* ── Weekly Mission ──────────────────────────────────────── */
+
+.missionBody {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.ringWrap {
+  position: relative;
+  width: 66px;
+  height: 66px;
+  flex-shrink: 0;
+}
+
+.ringLabel {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+}
+
+.ringLabel strong {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-text-secondary);
+}
+
+.ringLabel span {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--color-text);
+}
+
+.missionMeta {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.missionMeta p {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
+.missionMeta strong {
+  color: var(--color-text);
+  font-size: var(--text-md);
+}
+
+/* ── Verification ────────────────────────────────────────── */
+
+.verifyWidget {
+  border-color: rgba(251, 191, 36, 0.22);
+  background: linear-gradient(160deg, rgba(251, 191, 36, 0.05), var(--glass-bg) 55%);
+}
+
+.verifyList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.verifyRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: var(--text-sm);
+  color: var(--color-text);
+}
+
+.verifyTitle {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.verifyState {
+  font-size: var(--text-xs);
+  color: var(--color-text-tertiary);
+  white-space: nowrap;
+}
+
+.verifyNote {
+  margin: 0;
+  font-size: 11px;
+  color: var(--color-text-tertiary);
+}
+
+.spin {
+  animation: wSpin 1s linear infinite;
+}
+
+@keyframes wSpin {
+  to { transform: rotate(360deg); }
+}
+
+/* ── Leaderboard mini ────────────────────────────────────── */
+
+.rankLine {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
+.rankLine strong {
+  color: var(--color-gold);
+  font-size: var(--text-md);
+}
+
+.crown {
+  color: var(--color-gold);
+}
+
+.lbList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.lbRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
+.lbRow.lbMe {
+  background: rgba(var(--color-primary-rgb), 0.08);
+  border: 1px solid rgba(var(--color-primary-rgb), 0.25);
+  color: var(--color-text);
+}
+
+.lbRank {
+  font-weight: 800;
+  font-size: var(--text-xs);
+  width: 30px;
+  color: var(--color-text-tertiary);
+}
+
+.lbName {
+  flex: 1;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lbPts {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-weight: 700;
+  font-size: var(--text-xs);
+}

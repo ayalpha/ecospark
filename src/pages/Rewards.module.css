@@ -1,5 +1,5 @@
 /* src/pages/Rewards.module.css */
-.page { display: flex; flex-direction: column; gap: 24px; max-width: 1200px; }
+.page { display: flex; flex-direction: column; gap: 24px; max-width: 1200px; margin: 0 auto; }
 .header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
 .title { font-family: var(--font-display); font-size: var(--text-3xl); font-weight: var(--font-extrabold); color: var(--color-text); margin: 0; }
 .subtitle { color: var(--color-text-secondary); font-size: var(--text-base); margin: 4px 0 0; }

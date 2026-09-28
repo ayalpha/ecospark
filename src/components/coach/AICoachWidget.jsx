@@ -1,5 +1,6 @@
 // src/components/coach/AICoachWidget.jsx
-import { useRef, useEffect } from 'react';
+// Hosts THE single EcoSpark Agent: one FAB, one panel, global across pages.
+import { Bot } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useUiStore } from '../../store/uiStore';
 import { useAuthStore } from '../../store/authStore';
@@ -7,7 +8,7 @@ import CoachPanel from './CoachPanel';
 import styles from './AICoachWidget.module.css';
 
 export default function AICoachWidget() {
-  const { coachOpen, coachHasNewTip, toggleCoach } = useUiStore();
+  const { coachOpen, toggleCoach } = useUiStore();
   const { user } = useAuthStore();
 
   if (!user) return null;
@@ -21,7 +22,7 @@ export default function AICoachWidget() {
             id="ai-coach-fab"
             className={styles.fab}
             onClick={toggleCoach}
-            aria-label="Open AI Eco Coach"
+            aria-label="Open EcoSpark Agent"
             initial={{ scale: 0, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0, opacity: 0 }}
@@ -29,13 +30,12 @@ export default function AICoachWidget() {
             whileTap={{ scale: 0.94 }}
             transition={{ type: 'spring', stiffness: 400, damping: 25 }}
           >
-            <span className={styles.fabIcon}>🤖</span>
-            {coachHasNewTip && <span className={styles.tipBadge} />}
+            <Bot size={24} />
           </motion.button>
         )}
       </AnimatePresence>
 
-      {/* Coach Panel */}
+      {/* Agent Panel */}
       <AnimatePresence>
         {coachOpen && <CoachPanel />}
       </AnimatePresence>

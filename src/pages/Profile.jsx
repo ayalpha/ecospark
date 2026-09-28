@@ -7,7 +7,7 @@ import { compressImageToBase64 } from '../lib/imageUtils';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import Avatar from '../components/common/Avatar';
-import { Settings, Edit2, Image as ImageIcon, Camera } from 'lucide-react';
+import { Settings, Edit2, Camera, BarChart3, Handshake, Medal, Camera as CameraIcon, Zap, Flame, Trophy, CheckSquare, Leaf, Droplets } from 'lucide-react';
 import { REWARDS_DB } from '../constants/rewards';
 import styles from './Profile.module.css';
 
@@ -20,16 +20,18 @@ function WeeklyImpactCard({ profile }) {
   }, [profile?.id]);
 
   return (
-    <motion.div 
+    <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 0.5, duration: 0.5 }}
-      className={styles.dashboardCard} 
+      className={styles.dashboardCard}
       style={{ marginTop: '0', padding: '32px' }}
     >
-      <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', marginBottom: '24px' }}>
-        <h3 className={styles.badgesTitle}>📊 Weekly Impact</h3>
-        <span style={{ fontSize: '12px', background: 'rgba(255,255,255,0.1)', padding: '4px 12px', borderRadius: '100px', fontWeight: 'bold' }}>This week</span>
+      <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', marginBottom: '24px', alignItems: 'center' }}>
+        <h3 className={styles.badgesTitle} style={{ display: 'flex', alignItems: 'center', gap: '10px', margin: 0 }}>
+          <BarChart3 size={20} color="var(--color-primary-light)" /> Weekly Impact
+        </h3>
+        <span className={styles.weekPill}>This week</span>
       </div>
       <div className={styles.hologramStats} style={{ marginTop: '0' }}>
         <div className={styles.holoBox}>
@@ -41,7 +43,9 @@ function WeeklyImpactCard({ profile }) {
           <span className={styles.holoLabel}>CO₂ saved</span>
         </div>
       </div>
-      <p style={{ marginTop: '24px', fontSize: '12px', color: '#94a3b8', fontStyle: 'italic' }}>📸 Screenshot to share your weekly impact!</p>
+      <p style={{ marginTop: '24px', fontSize: '12px', color: 'var(--color-text-tertiary)', fontStyle: 'italic', display: 'flex', alignItems: 'center', gap: '6px' }}>
+        <CameraIcon size={14} /> Screenshot to share your weekly impact!
+      </p>
     </motion.div>
   );
 }
@@ -69,35 +73,35 @@ function ReferralCard({ profile }) {
   };
 
   return (
-    <motion.div 
+    <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 0.6, duration: 0.5 }}
-      className={styles.dashboardCard} 
+      className={styles.dashboardCard}
       style={{ marginTop: '0', padding: '32px' }}
     >
-      <h3 className={styles.badgesTitle}>🤝 Invite a Classmate</h3>
-      <p style={{ color: '#cbd5e1', marginBottom: '24px', fontSize: '16px' }}>
-        Earn <strong style={{ color: '#4ADE80' }}>50 bonus points</strong> when a friend joins and completes their first task.
+      <h3 className={styles.badgesTitle} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <Handshake size={20} color="var(--color-gold)" /> Invite a Classmate
+      </h3>
+      <p style={{ color: 'var(--color-text-secondary)', marginBottom: '24px', fontSize: 'var(--text-base)' }}>
+        Earn <strong style={{ color: 'var(--color-primary-light)' }}>50 bonus points</strong> when a friend joins and completes their first task.
       </p>
-      
-      <div style={{ background: 'rgba(0,0,0,0.4)', border: '1px dashed rgba(255,255,255,0.2)', padding: '20px', borderRadius: '16px', marginBottom: '16px', width: '100%', textAlign: 'center' }}>
-        <span style={{ fontFamily: 'monospace', fontSize: '28px', fontWeight: '900', letterSpacing: '0.2em', color: '#4ADE80' }}>
-          {profile?.referralCode}
-        </span>
+
+      <div className={styles.referralCodeBox}>
+        <span>{profile?.referralCode}</span>
       </div>
-      
-      <p style={{ color: '#94a3b8', fontSize: '14px', marginBottom: '24px', fontWeight: 'bold' }}>
+
+      <p style={{ color: 'var(--color-text-tertiary)', fontSize: 'var(--text-sm)', marginBottom: '24px', fontWeight: 'bold' }}>
         {profile?.referralCount || 0} friends invited
       </p>
-      
+
       <motion.button
         className={styles.saveBtn}
         onClick={share}
         whileTap={{ scale: 0.95 }}
-        style={{ width: '100%', padding: '16px', fontSize: '18px' }}
+        style={{ width: '100%', padding: '16px', fontSize: 'var(--text-md)' }}
       >
-        {copied ? '✅ Copied!' : '📤 Share Invite Link'}
+        {copied ? '✓ Copied!' : 'Share Invite Link'}
       </motion.button>
     </motion.div>
   );
@@ -274,12 +278,12 @@ export default function Profile() {
             <div className={styles.holoBox}>
               <span className={styles.holoVal}>
                 {profile?.streak || 0}
-                <motion.span 
-                  animate={{ scale: [1, 1.3, 1], rotate: [0, -10, 10, 0] }}
+                <motion.span
+                  animate={{ scale: [1, 1.25, 1] }}
                   transition={{ repeat: Infinity, duration: 1.5, ease: 'easeInOut' }}
-                  style={{ display: 'inline-block', color: '#ff6b6b', marginLeft: '6px' }}
+                  style={{ display: 'inline-flex', marginLeft: '8px', verticalAlign: 'middle' }}
                 >
-                  🔥
+                  <Flame size={22} color="var(--color-streak)" />
                 </motion.span>
               </span>
               <span className={styles.holoLabel}>Day Streak</span>
@@ -301,45 +305,47 @@ export default function Profile() {
       </motion.div>
 
       {/* Advanced Stats Grid */}
-      <motion.div 
+      <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.3, duration: 0.5 }}
         className={styles.advancedGrid}
       >
         {[
-          { icon: '⚡', val: (profile?.spendableBalance ?? profile?.points ?? 0).toLocaleString(), label: 'Points' },
-          { icon: '🔥', val: profile?.streak || 0, label: 'Current Streak' },
-          { icon: '🏆', val: profile?.longestStreak || 0, label: 'Longest Streak' },
-          { icon: '✅', val: profile?.totalTasksCompleted || 0, label: 'Completed' },
-          { icon: '🌿', val: `${((profile?.totalCO2Saved || 0) / 1000).toFixed(1)}kg`, label: 'CO₂ Saved' },
-          { icon: '💧', val: `${profile?.totalWaterSaved || 0}L`, label: 'Water Saved' },
-        ].map((s, i) => (
-          <motion.div 
-            key={s.label} 
+          { Icon: Zap, val: (profile?.spendableBalance ?? profile?.points ?? 0).toLocaleString(), label: 'Points', color: 'var(--color-gold)' },
+          { Icon: Flame, val: profile?.streak || 0, label: 'Current Streak', color: 'var(--color-streak)' },
+          { Icon: Trophy, val: profile?.longestStreak || 0, label: 'Longest Streak', color: 'var(--color-gold)' },
+          { Icon: CheckSquare, val: profile?.totalTasksCompleted || 0, label: 'Completed', color: 'var(--color-primary-light)' },
+          { Icon: Leaf, val: `${((profile?.totalCO2Saved || 0) / 1000).toFixed(1)}kg`, label: 'CO₂ Saved', color: 'var(--color-secondary-light)' },
+          { Icon: Droplets, val: `${profile?.totalWaterSaved || 0}L`, label: 'Water Saved', color: 'var(--color-info)' },
+        ].map(({ Icon, val, label, color }) => (
+          <motion.div
+            key={label}
             className={styles.gridCard}
             whileHover={{ y: -5, scale: 1.02 }}
           >
-            <span className={styles.gridIcon}>{s.icon}</span>
-            <span className={styles.gridVal}>{s.val}</span>
-            <span className={styles.gridLabel}>{s.label}</span>
+            <span className={styles.gridIcon}><Icon size={26} color={color} /></span>
+            <span className={styles.gridVal}>{val}</span>
+            <span className={styles.gridLabel}>{label}</span>
           </motion.div>
         ))}
       </motion.div>
 
       {/* Badges Showcase */}
       {profile?.badges?.length > 0 && (
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.4, duration: 0.5 }}
           className={styles.badgesShowcase}
         >
-          <h3 className={styles.badgesTitle}>🏅 Badges Earned</h3>
+          <h3 className={styles.badgesTitle} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <Medal size={20} color="var(--color-gold)" /> Badges Earned
+          </h3>
           <div className={styles.badgesGrid}>
             {profile.badges.map((b) => (
               <div key={b} className={styles.premiumBadge}>
-                <span className={styles.badgeIcon}>🏅</span>
+                <span className={styles.badgeIcon}><Medal size={22} color="var(--color-gold)" /></span>
                 <span className={styles.badgeLabel}>{b}</span>
               </div>
             ))}

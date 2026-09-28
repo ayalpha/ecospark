@@ -31,6 +31,8 @@ const About = React.lazy(() => import('./pages/About'));
 const Landing = React.lazy(() => import('./pages/Landing'));
 const Landing3D = React.lazy(() => import('./pages/Landing3D'));
 const News = React.lazy(() => import('./pages/News'));
+const Learn = React.lazy(() => import('./pages/Learn'));
+const Wallet = React.lazy(() => import('./pages/Wallet'));
 
 function LoadingScreen() {
   return (
@@ -120,9 +122,13 @@ export default function App() {
 
   // Apply saved preferences on mount
   useEffect(() => {
-    // Regalia is the flagship default for new installs. Anyone who has already
-    // picked a theme keeps it — this only changes the no-preference fallback.
-    const theme = localStorage.getItem('ecospark-theme') || 'regalia';
+    // Aurora launch: migrate everyone once to the new flagship dark theme.
+    // Users can still switch back in Settings — this runs a single time.
+    if (!localStorage.getItem('ecospark-theme-migrated-aurora')) {
+      localStorage.setItem('ecospark-theme-migrated-aurora', '1');
+      localStorage.setItem('ecospark-theme', 'aurora');
+    }
+    const theme = localStorage.getItem('ecospark-theme') || 'aurora';
     const reducedMotion = localStorage.getItem('ecospark-reduced-motion') === 'true'
       || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
     const textSize = localStorage.getItem('ecospark-text-size') || 'normal';
@@ -237,8 +243,12 @@ export default function App() {
                     <Route path="/" element={<Home />} />
                     <Route path="/news" element={<News />} />
                     <Route path="/tasks" element={<Tasks />} />
+                    {(settings.learnEnabled ?? true) && (
+                      <Route path="/learn" element={<Learn />} />
+                    )}
                     <Route path="/leaderboard" element={<Leaderboard />} />
                     <Route path="/rewards" element={<Rewards />} />
+                    <Route path="/wallet" element={<Wallet />} />
                     {(settings.arenaEnabled ?? true) && (
                       <Route path="/arena" element={<Arena />} />
                     )}

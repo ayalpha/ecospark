@@ -1,0 +1,70 @@
+/* src/components/ads/AdBanner.module.css */
+
+.wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  margin: 4px 0;
+}
+
+.label {
+  font-size: 9px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--color-text-tertiary, #64748b);
+}
+
+.inner {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  overflow: hidden;
+}
+
+/* Placeholder only renders while no ad code is configured. */
+.placeholder {
+  width: 100%;
+  max-width: 728px;
+  min-height: 90px;
+  border: 1px dashed var(--color-border-strong, rgba(148, 180, 200, 0.25));
+  border-radius: 10px;
+  background:
+    repeating-linear-gradient(
+      -45deg,
+      transparent 0 12px,
+      rgba(148, 180, 200, 0.03) 12px 24px
+    );
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 10px;
+}
+
+.size {
+  font-family: var(--font-mono, monospace);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-text-tertiary, #64748b);
+  letter-spacing: 0.1em;
+}
+
+.hintText {
+  font-size: 10px;
+  color: var(--color-text-tertiary, #64748b);
+  opacity: 0.7;
+}
+
+@media (max-width: 768px) {
+  .placeholder {
+    max-width: 320px;
+    min-height: 50px;
+    flex-direction: row;
+    gap: 10px;
+  }
+  .size { font-size: 11px; }
+  .hintText { display: none; }
+}

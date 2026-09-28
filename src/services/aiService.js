@@ -5,14 +5,19 @@
 const BASE_URL = import.meta.env.DEV ? 'http://localhost:3000' : '';
 
 /**
- * Stream AI coach reply via Server-Sent Events.
+ * The unified EcoSpark Agent — ONE companion for the whole app.
+ * Streams a reply that is grounded in the caller-built personal context
+ * (name, points, streak, tasks, page-time behaviour, learn progress, and the
+ * lesson currently open, if any). Every observation it makes must come from
+ * that context — the prompt forbids inventing data.
  * @param {Array} messages - Chat history [{role, content}, ...]
+ * @param {Object} context - Personal digest from agentContext.buildAgentContext()
  * @param {function} onToken - Called with each text token as it streams
  * @param {function} onDone - Called when stream completes
  * @param {function} onError - Called on error
  * @returns {AbortController} - Call .abort() to cancel
  */
-export function streamCoachReply(messages, onToken, onDone, onError) {
+export function streamAgentReply(messages, context, onToken, onDone, onError) {
   const controller = new AbortController();
 
   (async () => {
@@ -22,7 +27,21 @@ export function streamCoachReply(messages, onToken, onDone, onError) {
 
       const systemPrompt = {
         role: 'system',
-        content: `You are EcoSpark Coach, a friendly, encouraging environmental expert guiding students... (Keep responses under 3 short sentences, use emojis!)`
+        content: `You are the EcoSpark Agent — the user's ONE personal eco-journey companion inside the EcoSpark app. You know this user personally from the REAL data provided in the context JSON.
+
+Rules:
+- This is ONE continuous conversation, not a series of first contacts. Greet the user by name ONLY in your very first message of the session. If the history already contains any assistant reply, NEVER open with "Hey/Hi [name]" or any greeting — jump straight into the substance, like a friend mid-chat. Short messages like "ohh" or "ok" get short, natural follow-ups, not new speeches.
+- Use the user's name sparingly — a few times per session at most, never in every reply.
+- Ground every observation in the context data: their points, streak, tasks, CO2 saved, page-time behaviour, recent clicks, learn progress. Reference real specifics ("you've spent 14 min in the Arena", "your streak is 3 days", "you completed 23 tasks all-time but earned almost nothing this week").
+- Compare recent vs past behaviour when the data allows it (weekly vs lifetime points, recent page segments vs top pages, lessons done vs lessons left) and gently nudge — like a friend who actually pays attention.
+- Remember what the user told you earlier in the conversation (their school, preferences, plans) and build on it without being told again.
+- NEVER invent numbers, pages, events or facts that are not in the context or the conversation history.
+- If context.openLesson is present, you are tutoring that lesson: ground answers in it and go beyond it when asked.
+- Warm, encouraging, concise. Under 120 words unless asked for more. Emojis welcome but sparingly.
+- Reply in the language the user writes in.
+
+Context JSON:
+${JSON.stringify(context)}`
       };
 
       // Strip out internal UI fields like 'streaming' before sending to API
@@ -38,17 +57,18 @@ export function streamCoachReply(messages, onToken, onDone, onError) {
           'Authorization': `Bearer ${apiKey}`
         },
         body: JSON.stringify({
-          model: 'llama-3.3-70b-versatile',
+          model: 'openai/gpt-oss-120b',
           messages: [systemPrompt, ...cleanMessages],
           stream: true,
           temperature: 0.7,
-          max_tokens: 200,
+          reasoning_effort: 'low',
+          max_tokens: 400,
         }),
         signal: controller.signal,
       });
 
       if (!response.ok) {
-        throw new Error(`Coach API error: ${response.status}`);
+        throw new Error(`Agent API error: ${response.status}`);
       }
 
       const reader = response.body.getReader();
@@ -81,7 +101,7 @@ export function streamCoachReply(messages, onToken, onDone, onError) {
       onDone?.();
     } catch (err) {
       if (err.name === 'AbortError') return;
-      console.error('[aiService] Coach stream error:', err);
+      console.error('[aiService] Agent stream error:', err);
       onError?.(err);
     }
   })();
@@ -183,12 +203,34 @@ Respond ONLY with a JSON object like this (no markdown, no extra text):
     const confidence = aiResult.confidence ?? 0.5;
     const status = confidence >= 0.4 ? 'approved' : 'flagged';
 
-    const { updateSubmissionStatus } = await import('./firestoreService');
+    const { updateSubmissionStatus, awardSubmissionPoints } = await import('./firestoreService');
     await updateSubmissionStatus(submissionId, status, {
       aiVerdict: confidence >= 0.7,
       confidence,
       reason: aiResult.reason || 'Client-side verification completed',
     });
+
+    // Award here rather than in the modal: this async flow keeps running even
+    // if the user closes the modal or leaves the page mid-verification, so an
+    // approved submission can never lose its payout. Idempotent via
+    // awardSubmissionPoints' transaction guard.
+    if (status === 'approved') {
+      try {
+        const { getDoc, doc } = await import('firebase/firestore');
+        const { db } = await import('../lib/firebase');
+        const subSnap = await getDoc(doc(db, 'submissions', submissionId));
+        if (subSnap.exists()) {
+          const sub = subSnap.data();
+          await awardSubmissionPoints(sub.userId, submissionId, sub.points || 50, {
+            co2Saved: sub.co2 || 0,
+            waterSaved: sub.water || 0,
+            wasteSaved: sub.waste || 0,
+          });
+        }
+      } catch (awardErr) {
+        console.error('[aiService] auto-award failed:', awardErr);
+      }
+    }
   } catch (err) {
     console.error('Client-side AI verification failed:', err);
 
@@ -247,9 +289,10 @@ Do NOT include any extra text, only the JSON object.`
         'Authorization': `Bearer ${apiKey}`
       },
       body: JSON.stringify({
-        model: 'llama-3.3-70b-versatile', // using stable, high quality model
+        model: 'openai/gpt-oss-120b', // using stable, high quality model
         messages: [systemPrompt, userPrompt],
         temperature: 0.95,
+        reasoning_effort: 'low',
         response_format: { type: 'json_object' }
       })
     });
@@ -524,7 +567,7 @@ Each item:
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
     body: JSON.stringify({
-      model: 'llama-3.3-70b-versatile',
+      model: 'openai/gpt-oss-120b',
       messages: [{
         role: 'system',
         content: `[Seed:${seed}] You are an eco-education quizmaster for a sustainability platform.
@@ -535,6 +578,7 @@ Respond ONLY with a valid JSON array. Schema:
 [{"id":"q1","question":"...","options":["A","B","C","D"],"correctIndex":0,"topic":"climate","fact":"Short fun eco fact"}]`
       }],
       temperature: 1.0,
+      reasoning_effort: 'low',
     })
   });
 

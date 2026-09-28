@@ -139,7 +139,35 @@ service cloud.firestore {
     match /transactions/{transactionId} {
       allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
       allow read: if isStaff();
-      allow write: if isStaff();
+      // History mirrors are append-only and self-attributed: the client-side
+      // economy (task awards, referrals, oracle payouts, trade closes) may
+      // append an entry for itself, but never edit or delete history.
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isStaff();
+    }
+
+    // ── CRYPTO PAYOUTS (Wallet) ────────────────────────────────────────────
+    // A payout request locks points the moment it is created (the client
+    // deducts spendableBalance in the same breath). Users may create pending
+    // requests for themselves and cancel their own still-pending ones; only
+    // staff can mark requests paid (with a txid) or reject them (points are
+    // refunded by the admin client).
+    match /payouts/{payoutId} {
+      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow read: if isStaff();
+      allow create: if isAuthenticated()
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.status == 'pending'
+        && request.resource.data.points is number
+        && request.resource.data.points > 0
+        && request.resource.data.coin is string
+        && request.resource.data.address is string;
+      // User may only cancel their own pending request; staff may set any status.
+      allow update: if isStaff() ||
+        (isAuthenticated() && resource.data.userId == request.auth.uid
+          && resource.data.status == 'pending'
+          && request.resource.data.status == 'cancelled');
+      allow delete: if isStaff();
     }
 
     // ── ORACLE PREDICTION MARKETS (live board) ─────────────────────────────

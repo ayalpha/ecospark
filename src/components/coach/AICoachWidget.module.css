@@ -1,4 +1,4 @@
-/* src/components/coach/AICoachWidget.module.css */
+/* src/components/coach/AICoachWidget.module.css — the single agent FAB */
 
 .fab {
   position: fixed;
@@ -7,14 +7,15 @@
   width: 56px;
   height: 56px;
   border-radius: 50%;
-  background: linear-gradient(135deg, var(--color-primary), var(--color-secondary));
-  border: none;
+  background: linear-gradient(135deg, #0E2B22, #0A1F1A);
+  border: 1px solid rgba(45, 212, 167, 0.4);
+  color: #2DD4A7;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: var(--elevation-3), var(--glow-primary);
-  z-index: 1000;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.5), 0 0 24px rgba(45, 212, 167, 0.15);
+  z-index: 999;
 }
 
 @media (min-width: 768px) {
@@ -23,21 +24,21 @@
   }
 }
 
-.fabIcon {
-  font-size: 24px;
-  line-height: 1;
-}
-
-.tipBadge {
+.fab::before {
+  content: '';
   position: absolute;
-  top: 8px;
-  right: 8px;
-  width: 10px;
-  height: 10px;
-  background: var(--color-gold);
+  inset: -1px;
   border-radius: 50%;
-  border: 2px solid white;
-  animation: glow-pulse 2s ease-in-out infinite;
+  border: 1px solid rgba(45, 212, 167, 0.5);
+  animation: fabRing 2.6s ease-out infinite;
+  pointer-events: none;
 }
 
-/* src/components/coach/CoachPanel.module.css - included here for simplicity */
+@keyframes fabRing {
+  0% { transform: scale(1); opacity: 0.6; }
+  100% { transform: scale(1.5); opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fab::before { animation: none; }
+}

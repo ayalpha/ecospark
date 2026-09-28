@@ -81,8 +81,8 @@ function TaskCard({ task, submissions, onLog }) {
       <p className={styles.taskDesc}>{task.description}</p>
 
       <div className={styles.taskImpact}>
-        {task.co2 && <span><PremiumIcon icon={Globe} color="emerald" size={14} /> {task.co2}g CO₂ saved</span>}
-        {task.water && <span><PremiumIcon icon={Droplets} color="sapphire" size={14} /> {task.water}L water saved</span>}
+        {task.co2 > 0 && <span><PremiumIcon icon={Globe} color="emerald" size={14} /> {task.co2}g CO₂ saved</span>}
+        {task.water > 0 && <span><PremiumIcon icon={Droplets} color="sapphire" size={14} /> {task.water}L water saved</span>}
       </div>
 
       <div className={styles.taskFooter}>

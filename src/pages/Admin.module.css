@@ -445,3 +445,148 @@
 .dropdownItem.danger:hover {
   background: rgba(239, 68, 68, 0.1);
 }
+
+/* ═══ Platform Features — premium toggle cards ═══════════════════════════ */
+
+.featureGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 14px;
+}
+
+.featureCard {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 18px;
+  border-radius: 14px;
+  background: var(--color-surface-hover);
+  border: 1px solid var(--color-border);
+  transition: border-color var(--transition-micro), box-shadow var(--transition-micro);
+}
+
+.featureCard.on {
+  border-color: color-mix(in srgb, var(--feature-accent, #2DD4A7) 38%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--feature-accent, #2DD4A7) 12%, transparent), 0 6px 20px rgba(0, 0, 0, 0.25);
+}
+
+.featureCard.off { opacity: 0.72; }
+
+.featureIconChip {
+  width: 44px;
+  height: 44px;
+  border-radius: 13px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--feature-accent, #2DD4A7);
+  background: color-mix(in srgb, var(--feature-accent, #2DD4A7) 11%, transparent);
+  border: 1px solid color-mix(in srgb, var(--feature-accent, #2DD4A7) 30%, transparent);
+}
+
+.featureText { flex: 1; min-width: 0; }
+
+.featureTitle {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: 700;
+  color: var(--color-text);
+  letter-spacing: 0.02em;
+}
+
+.featureDesc {
+  margin: 3px 0 0;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--color-text-tertiary);
+}
+
+/* iOS-style switch */
+.switch {
+  all: unset;
+  position: relative;
+  width: 46px;
+  height: 26px;
+  border-radius: 999px;
+  background: rgba(148, 180, 200, 0.16);
+  border: 1px solid var(--color-border-strong);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background var(--transition-standard), border-color var(--transition-standard);
+}
+
+.switch::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #E7ECF4;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+  transition: transform var(--transition-standard), background var(--transition-standard);
+}
+
+.switch.on {
+  background: linear-gradient(135deg, var(--feature-accent, #2DD4A7), color-mix(in srgb, var(--feature-accent, #2DD4A7) 65%, #22D3EE));
+  border-color: transparent;
+  box-shadow: 0 0 14px color-mix(in srgb, var(--feature-accent, #2DD4A7) 40%, transparent);
+}
+
+.switch.on::after { transform: translateX(20px); background: #FFFFFF; }
+
+.switch:disabled { opacity: 0.45; cursor: not-allowed; }
+
+/* sub-feature pills inside a card */
+.subToggles {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--color-border);
+  width: 100%;
+}
+
+.subToggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
+.subSwitch {
+  all: unset;
+  position: relative;
+  width: 34px;
+  height: 19px;
+  border-radius: 999px;
+  background: rgba(148, 180, 200, 0.16);
+  border: 1px solid var(--color-border);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background var(--transition-standard);
+}
+
+.subSwitch::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: #E7ECF4;
+  transition: transform var(--transition-standard);
+}
+
+.subSwitch.on { background: rgba(45, 212, 167, 0.55); }
+.subSwitch.on::after { transform: translateX(15px); background: #FFFFFF; }
+
+@media (prefers-reduced-motion: reduce) {
+  .switch::after, .subSwitch::after { transition: none; }
+}

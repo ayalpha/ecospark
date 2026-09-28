@@ -159,3 +159,58 @@
   font-family: 'Inter', sans-serif;
   color: var(--color-text-secondary);
 }
+
+/* ── Endless-edition additions ───────────────────────────── */
+
+.sentinel {
+  display: flex;
+  justify-content: center;
+  padding: 28px 0 40px;
+  min-height: 60px;
+}
+
+.loadingMore {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.spin {
+  animation: newsSpin 1s linear infinite;
+}
+
+@keyframes newsSpin {
+  to { transform: rotate(360deg); }
+}
+
+.loadMoreBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 12px 26px;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 180, 200, 0.22);
+  background: var(--color-surface-raised, #161d2b);
+  color: var(--color-text);
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  cursor: pointer;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.loadMoreBtn:hover {
+  border-color: rgba(var(--color-primary-rgb), 0.5);
+  box-shadow: var(--glow-primary);
+  transform: translateY(-1px);
+}
+
+.endNote {
+  margin: 0;
+  color: var(--color-text-tertiary);
+  font-size: var(--text-sm);
+  font-style: italic;
+}

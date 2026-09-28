@@ -36,5 +36,8 @@
 @media (min-width: 1280px) {
   .pageWrapper {
     max-width: var(--max-content);
+    /* Center the capped wrapper in the space right of the sidebar — without
+       this, ultra-wide windows pile all the dead space on the right. */
+    margin: 0 auto;
   }
 }

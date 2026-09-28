@@ -26,8 +26,9 @@ const USERS_COL = 'users';
 const HOUSE_EDGE = 0.95; // 5% platform take baked into payouts
 export const MIN_BET = 50;
 export const MAX_BET = 5000;
-// CoinGecko free tier is rate limited — cap how many crypto markets we mint.
-const CRYPTO_POOL_CAP = 4;
+// CoinGecko free tier is rate limited — the tick tops the board up in one
+// batched price call; 8 coins × 2 expiries keeps a Polymarket-style breadth.
+const CRYPTO_POOL_CAP = 16;
 
 // ─── Odds engine ─────────────────────────────────────────────────────────────
 
@@ -100,10 +101,14 @@ export async function getActiveOracleMarkets() {
 // ─── Live crypto prices (CoinGecko, free, no key) ───────────────────────────
 
 const COINS = [
-  { id: 'bitcoin',  sym: 'BTC', emoji: '₿' },
-  { id: 'ethereum', sym: 'ETH', emoji: 'Ξ' },
-  { id: 'solana',   sym: 'SOL', emoji: '◎' },
-  { id: 'ripple',   sym: 'XRP', emoji: '✕' },
+  { id: 'bitcoin',   sym: 'BTC',  emoji: '₿' },
+  { id: 'ethereum',  sym: 'ETH',  emoji: 'Ξ' },
+  { id: 'solana',    sym: 'SOL',  emoji: '◎' },
+  { id: 'ripple',    sym: 'XRP',  emoji: '✕' },
+  { id: 'binancecoin', sym: 'BNB', emoji: '🔶' },
+  { id: 'dogecoin',  sym: 'DOGE', emoji: '🐕' },
+  { id: 'cardano',   sym: 'ADA',  emoji: '🔵' },
+  { id: 'chainlink', sym: 'LINK', emoji: '🔗' },
 ];
 
 /** Fetch live USD prices + 24h change for the tracked coins. */
@@ -124,32 +129,26 @@ function fmtUsd(v) {
 }
 
 /**
- * Strike level for a crypto market. Positioned NEAR the current price so the
- * outcome is genuinely uncertain — not 25% below (which would make every ABOVE
- * market a guaranteed win). We pick a small random offset in [-3.5%, +3.5%]
- * of the current price and lay the strike on one side, so YES/NO are roughly
- * 50/50 at generation and price moves decide the result.
+ * Strike level for a crypto market. `signedPct` places the strike on one side
+ * of the live price — near strikes (±0.4–1.2%) make short markets genuinely
+ * uncertain; farther strikes (±1.5–3.5%) suit long expiries.
  */
-function cryptoLevel(price) {
-  const pct = (Math.random() * 7 - 3.5) / 100; // signed, range -3.5% … +3.5%
-  const raw = price * (1 + pct);
+function cryptoLevel(price, signedPct) {
+  const raw = price * (1 + signedPct / 100);
   if (raw < 1) return Math.round(raw * 1000) / 1000;
   if (raw >= 1000) return Math.round(raw);
   return Math.round(raw * 100) / 100;
 }
 
 /** Next daily close from the fixed UTC hours [3, 11, 19], at least 12h out. */
-function cryptoEndTime() {
-  const d = new Date(Date.now() + 12 * 3600 * 1000);
-  for (let add = 0; add < 3; add++) {
-    const day = new Date(d.getTime() + add * 86400 * 1000);
-    const hours = [3, 11, 19];
-    for (const h of hours) {
-      const t = new Date(Date.UTC(day.getUTCFullYear(), day.getUTCMonth(), day.getUTCDate(), h, 59, 59));
-      if (t.getTime() > Date.now() + 12 * 3600 * 1000) return t;
-    }
-  }
-  return new Date(Date.now() + 2 * 86400 * 1000);
+/**
+ * Expiry for a minted market — index alternates the board between SHORT
+ * (1.5–4h, the visible heartbeat) and LONG (12–24h, board depth).
+ */
+function cryptoEndTime(index = 0) {
+  const short = index % 2 === 0;
+  const hours = short ? 1.5 + Math.random() * 2.5 : 12 + Math.random() * 12;
+  return new Date(Date.now() + hours * 3600 * 1000);
 }
 
 function baseOptions() {
@@ -159,59 +158,74 @@ function baseOptions() {
   ];
 }
 
+/** Close time rendered in the VIEWER'S local timezone (no more UTC confusion). */
 function fmtCloseLabel(endTime) {
   const d = new Date(endTime);
   return d.toLocaleString('en-US', {
-    month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'UTC', timeZoneName: 'short'
+    month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
   });
 }
 
-/** Build crypto market documents from live prices. Pure data — no AI. */
+/**
+ * Build crypto market documents from live prices. Pure data — no AI.
+ * Two markets per coin: one near-strike short-expiry, one farther-strike
+ * long-expiry — so the board always has a market about to close while
+ * keeping depth, across ALL tracked coins.
+ */
 function buildCryptoMarkets(prices) {
-  const now = Date.now();
   const markets = [];
+  let index = 0;
   for (const coin of COINS) {
     const p = prices?.[coin.id];
     if (!p || typeof p.usd !== 'number') continue;
     const price = p.usd;
     const chg = p.usd_24h_change || 0;
-    const level = cryptoLevel(price);
-    const above = price >= level;
-    const endTime = cryptoEndTime();
-    const closeLabel = fmtCloseLabel(endTime);
-    const endStr = endTime.toISOString().slice(0, 16).replace(/[-:]/g, '').slice(0, 12);
 
-    markets.push({
-      id: `crypto_${coin.id}_${above ? 'above' : 'below'}_${level}_${endStr}`,
-      kind: 'crypto',
-      title: `Will ${coin.sym} trade ${above ? 'ABOVE' : 'BELOW'} ${fmtUsd(level)} at ${closeLabel}?`,
-      description: `${coin.sym} is live at ${fmtUsd(price)} (24h ${chg >= 0 ? '+' : ''}${chg.toFixed(1)}%). Settles on the real CoinGecko price at close — strike fixed at ${fmtUsd(level)} from today's price.`,
-      category: 'Crypto Prices',
-      emoji: coin.emoji,
-      endTime: endTime.toISOString(),
-      crypto: {
-        coinId: coin.id,
-        symbol: coin.sym,
-        level,
-        above,
-        basePrice: price,
-        base24h: Math.round(chg * 10) / 10,
-        feed: 'coingecko',
-      },
-      options: baseOptions(),
-      totalStaked: 0,
-      betCount: 0,
-      status: 'active',
-      winner: null,
-      settleReason: null,
-      settlementAttempted: false,
-      settlementAttempts: 0,
-      settledAt: null,
-      generatedDate: new Date().toISOString().slice(0, 10),
-      source: 'CoinGecko live prices',
-    });
+    const variants = [
+      { signedPct: (0.4 + Math.random() * 0.8) * (Math.random() < 0.5 ? -1 : 1), expiryIndex: index },
+      { signedPct: (1.5 + Math.random() * 2) * (Math.random() < 0.5 ? -1 : 1), expiryIndex: index + 1 },
+    ];
+
+    for (const v of variants) {
+      const level = cryptoLevel(price, v.signedPct);
+      const above = price >= level;
+      const endTime = cryptoEndTime(v.expiryIndex);
+      const closeLabel = fmtCloseLabel(endTime);
+      const endStr = endTime.toISOString().slice(0, 16).replace(/[-:]/g, '').slice(0, 12);
+
+      markets.push({
+        id: `crypto_${coin.id}_${above ? 'above' : 'below'}_${level}_${endStr}`,
+        kind: 'crypto',
+        title: `Will ${coin.sym} trade ${above ? 'ABOVE' : 'BELOW'} ${fmtUsd(level)} by ${closeLabel}?`,
+        description: `${coin.sym} is live at ${fmtUsd(price)} (24h ${chg >= 0 ? '+' : ''}${chg.toFixed(1)}%). Settles on the real CoinGecko price at close — strike fixed at ${fmtUsd(level)} from today's price.`,
+        category: 'Crypto Prices',
+        emoji: coin.emoji,
+        endTime: endTime.toISOString(),
+        crypto: {
+          coinId: coin.id,
+          symbol: coin.sym,
+          level,
+          above,
+          basePrice: price,
+          base24h: Math.round(chg * 10) / 10,
+          feed: 'coingecko',
+        },
+        options: baseOptions(),
+        totalStaked: 0,
+        betCount: 0,
+        status: 'active',
+        winner: null,
+        settleReason: null,
+        settlementAttempted: false,
+        settlementAttempts: 0,
+        settledAt: null,
+        generatedDate: new Date().toISOString().slice(0, 10),
+        source: 'CoinGecko live prices',
+      });
+    }
+    index += 2;
   }
-  return markets.slice(0, CRYPTO_POOL_CAP);
+  return markets;
 }
 
 /**
@@ -278,7 +292,7 @@ export async function refreshOracleMarketsIfStale() {
   let added = 0;
 
   // 1. Crypto markets from live prices (primary, deterministic).
-  if (cryptoActive < 2) {
+  if (cryptoActive < 8) {
     try {
       const prices = await fetchCryptoPrices();
       for (const market of buildCryptoMarkets(prices)) {
@@ -293,7 +307,7 @@ export async function refreshOracleMarketsIfStale() {
   }
 
   // 2. Event markets from live-web-grounded Gemini (only when the board is thin).
-  if (eventActive < 2) {
+  if (eventActive < 3) {
     try {
       const generated = await generateOracleMarkets([...existing].map(m => m.title));
       for (const g of generated) {
@@ -359,12 +373,17 @@ export async function placeBetOnMarket({ userId, profile, marketId, optionId, am
 
   const batch = writeBatch(db);
 
-  const optionUpdates = {};
-  market.options.forEach((o, idx) => {
-    if (o.id === optionId) optionUpdates[`options.${idx}.totalStaked`] = increment(amount);
-  });
+  // Replace the whole `options` array (with the chosen option's stake folded
+  // in and odds recalculated). The security rule validates bet-forward by
+  // comparing totalStaked/betCount against the old doc — but it reports
+  // affected keys literally, and a dot-path update (`options.0.totalStaked`)
+  // would fail `hasOnly(['options', …])`. A full-array write reports exactly
+  // the keys the rule whitelists.
+  const stakedOptions = market.options.map((o) =>
+    o.id === optionId ? { ...o, totalStaked: (o.totalStaked || 0) + amount } : o
+  );
   batch.update(marketRef, {
-    ...optionUpdates,
+    options: recalculateMultipliers(stakedOptions),
     totalStaked: increment(amount),
     betCount: increment(1),
   });
@@ -401,18 +420,35 @@ export async function placeBetOnMarket({ userId, profile, marketId, optionId, am
 
 // ─── Settlement ──────────────────────────────────────────────────────────────
 
+/**
+ * Derive the payout outcome from an ALREADY-resolved market (read-only).
+ * Actual settlement happens server-side via /api/oracle-tick — clients can
+ * never write settlement fields (security rules), so this only translates a
+ * settled/voided verdict into the payout outcome. Returns null while the
+ * market is still active (the tick will resolve it).
+ */
+function outcomeOfMarket(market) {
+  if (market.status === 'settled') {
+    return {
+      status: 'settled', winner: market.winner,
+      reason: market.settleReason || '', sources: market.settleSources || [],
+      price: market.settlePrice ?? null,
+    };
+  }
+  if (market.status === 'voided') {
+    return { status: 'voided', reason: market.settleReason || 'Market voided — stakes refunded' };
+  }
+  return null; // still active — the tick owns settlement
+}
 const MAX_SETTLE_ATTEMPTS = 5;
-const SETTLE_RETRY_GAP_MS = 60 * 60 * 1000; // don't re-hit APIs more than once/hour
 
 /**
  * Resolve this user's pending bets on expired markets.
  *
- * Each market is settled from real data at expiry:
- *  · crypto  → actual CoinGecko price at the deadline
- *  · event   → search-grounded Gemini verdict with cited sources
- *
- * Only a high-confidence verdict pays out. Insufficient evidence voids the
- * market and refunds every stake in full — a bet is never settled by guessing.
+ * Settlement itself runs server-side (/api/oracle-tick — the security rules
+ * freeze settlement fields for clients). When a bet sits on an unresolved
+ * expired market, this flow asks the tick to resolve it, reads the verdict,
+ * and pays out atomically on the user's own document.
  * Returns { settled: [...], pointsAwarded, refunded, outcomes }.
  */
 export async function settleExpiredMarketsForUser(userId, profile) {
@@ -434,77 +470,27 @@ export async function settleExpiredMarketsForUser(userId, profile) {
 
   for (const marketId of expiredMarketIds) {
     try {
-      const marketRef = doc(db, MARKETS_COL, marketId);
-      const marketSnap = await getDoc(marketRef);
+      let marketSnap = await getDoc(doc(db, MARKETS_COL, marketId));
 
       if (!marketSnap.exists()) {
         outcomes[marketId] = { status: 'voided', reason: 'Market no longer exists — stakes refunded' };
         continue;
       }
 
-      const market = { id: marketSnap.id, ...marketSnap.data() };
+      let market = { id: marketSnap.id, ...marketSnap.data() };
 
-      if (market.status === 'settled') {
-        outcomes[marketId] = {
-          status: 'settled', winner: market.winner,
-          reason: market.settleReason || '', sources: market.settleSources || [],
-          price: market.settlePrice ?? null,
-        };
-        continue;
-      }
-      if (market.status === 'voided') {
-        outcomes[marketId] = { status: 'voided', reason: market.settleReason || 'Market voided — stakes refunded' };
-        continue;
+      // Client writes cannot settle a market (rules freeze settlement), so
+      // when a bet sits on an active-but-expired market, ask the trusted
+      // tick to resolve it first, then read the verdict.
+      if (market.status === 'active' && new Date(market.endTime) <= now) {
+        await runMarketCycle();
+        marketSnap = await getDoc(doc(db, MARKETS_COL, marketId));
+        market = marketSnap.exists() ? { id: marketSnap.id, ...marketSnap.data() } : market;
       }
 
-      // Rate-limit settlement attempts; after MAX tries, void + refund.
-      const attempts = market.settlementAttempts || 0;
-      const lastAttempt = market.lastSettleAttemptAt?.toMillis?.() || 0;
-      if (attempts >= MAX_SETTLE_ATTEMPTS) {
-        await updateDoc(marketRef, {
-          status: 'voided',
-          settleReason: `Could not establish a verified outcome after ${attempts} attempts — all stakes refunded`,
-          settledAt: serverTimestamp(),
-        });
-        outcomes[marketId] = { status: 'voided', reason: 'Outcome could not be verified — stakes refunded' };
-        continue;
-      }
-      if (attempts > 0 && Date.now() - lastAttempt < SETTLE_RETRY_GAP_MS) {
-        continue; // wait out the retry gap
-      }
-
-      await updateDoc(marketRef, {
-        settlementAttempted: true,
-        settlementAttempts: attempts + 1,
-        lastSettleAttemptAt: serverTimestamp(),
-      });
-
-      const verdict = market.kind === 'crypto'
-        ? await settleCryptoMarket(market)
-        : await settleOracleMarket(market);
-
-      if (verdict.result === 'undecided') {
-        await updateDoc(marketRef, {
-          status: 'voided',
-          settleReason: verdict.reason || 'Outcome could not be verified at expiry — stakes refunded',
-          settleSources: verdict.sources || [],
-          settledAt: serverTimestamp(),
-        });
-        outcomes[marketId] = { status: 'voided', reason: verdict.reason || 'Outcome not verified — stakes refunded', sources: verdict.sources || [] };
-      } else {
-        await updateDoc(marketRef, {
-          status: 'settled',
-          winner: verdict.result,
-          settleReason: verdict.reason,
-          settleSources: verdict.sources || [],
-          settlePrice: verdict.price ?? null,
-          settledAt: serverTimestamp(),
-        });
-        outcomes[marketId] = {
-          status: 'settled', winner: verdict.result,
-          reason: verdict.reason, sources: verdict.sources || [], price: verdict.price ?? null,
-        };
-      }
+      const outcome = outcomeOfMarket(market);
+      if (outcome) outcomes[marketId] = outcome;
+      // Still active? The tick resolves it — the bet stays pending until then.
     } catch (err) {
       console.error('[Oracle] Settlement failed for market', marketId, err);
     }
@@ -588,3 +574,46 @@ export async function settleExpiredMarketsForUser(userId, profile) {
     outcomes,
   };
 }
+
+/**
+ * Board-wide housekeeping: settle expired markets even when nobody has a bet
+ * on them, so the board never fills up with zombie "closed — settling" cards.
+ * Called on Arena mount. Payouts are NOT handled here — they happen per-user
+ * in settleExpiredMarketsForUser, which picks up the settled/voided status.
+ *
+ * Crypto markets settle from the free CoinGecko feed (cheap, deterministic);
+ * event markets need a Gemini search call, so only a couple per sweep.
+ */
+export async function sweepStaleMarkets() {
+  return runMarketCycle();
+}
+
+/**
+ * One full housekeeping heartbeat for the Oracle: settle everything that has
+ * expired, then top the board back up with fresh markets. Call this on Arena
+ * mount AND on an interval — it is the engine that keeps the market cycle
+ * running (expire → settle → replace) without any manual action.
+ */
+export async function runMarketCycle() {
+  // Settlement writes are frozen for clients by the security rules — the
+  // trusted oracle-tick function runs the whole cycle with Admin privileges:
+  // settle expired markets from the real price feed, void the unverifiable,
+  // and mint fresh crypto markets so the board never goes stale.
+  try {
+    const { auth } = await import('../lib/firebase');
+    const user = auth.currentUser;
+    if (!user) return { settled: 0, voided: 0, created: 0 };
+    const token = await user.getIdToken();
+    const res = await fetch('/api/oracle-tick', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: '{}',
+    });
+    if (!res.ok) return { settled: 0, voided: 0, created: 0, error: res.status };
+    return await res.json();
+  } catch (err) {
+    console.warn('[Oracle] tick call failed:', err.message);
+    return { settled: 0, voided: 0, created: 0, error: err.message };
+  }
+}
+

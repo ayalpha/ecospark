@@ -7,6 +7,7 @@ import BottomTabBar from './BottomTabBar';
 import OfflineBanner from '../common/OfflineBanner';
 import StreakRiskBanner from '../common/StreakRiskBanner';
 import AICoachWidget from '../coach/AICoachWidget';
+import ActivityTracker from './ActivityTracker';
 import AppEntryAnimation from '../common/AppEntryAnimation';
 import styles from './AppShell.module.css';
 
@@ -46,7 +47,10 @@ export default function AppShell({ children }) {
       {/* Mobile bottom tab bar */}
       <BottomTabBar />
 
-      {/* AI Coach FAB — mounted once at app shell level */}
+      {/* Behaviour memory for the unified agent */}
+      <ActivityTracker />
+
+      {/* EcoSpark Agent FAB — mounted once at app shell level */}
       <AICoachWidget />
 
       {/* App Entry Animations */}

@@ -1,12 +1,23 @@
 // src/components/coach/CoachPanel.jsx
+// THE EcoSpark Agent — one unified companion for the whole app.
+// Opens with a greeting generated from the user's REAL profile + behaviour
+// (name, points, streak, tasks, page-time, clicks, learn progress), and every
+// reply is grounded in that same context. When a lesson is open on /learn it
+// tutors that lesson.
+
 import { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useUiStore } from '../../store/uiStore';
 import { useAuthStore } from '../../store/authStore';
-import { streamCoachReply } from '../../services/aiService';
-import PremiumIcon from '../common/PremiumIcon';
-import { Leaf, Trash2, X, Timer, Send } from 'lucide-react';
+import { streamAgentReply } from '../../services/aiService';
+import { buildAgentContext, loadAgentChat, saveAgentChat } from '../../services/agentContext';
+import { BrainCircuit, Trash2, X, Send, Loader2 } from 'lucide-react';
 import styles from './CoachPanel.module.css';
+
+const GREETING_INSTRUCTION =
+  '(Open the session: greet me like a friend who knows my data. One short paragraph — greet me by name, one specific real observation about my activity, one gentle nudge or question.)';
+
+const firstName = (full) => (full || '').trim().split(/\s+/)[0] || '';
 
 function ChatMessage({ message }) {
   const isUser = message.role === 'user';
@@ -17,7 +28,9 @@ function ChatMessage({ message }) {
       transition={{ duration: 0.2 }}
       className={`${styles.message} ${isUser ? styles.userMessage : styles.assistantMessage}`}
     >
-      {!isUser && <span className={styles.botAvatar}><PremiumIcon icon={Leaf} color="emerald" size={20} /></span>}
+      {!isUser && (
+        <span className={styles.botAvatar}><BrainCircuit size={16} /></span>
+      )}
       <div className={`${styles.bubble} ${isUser ? styles.userBubble : styles.botBubble}`}>
         {message.content || (message.streaming ? <TypingDots /> : '')}
       </div>
@@ -40,10 +53,12 @@ export default function CoachPanel() {
   const { profile } = useAuthStore();
   const [input, setInput] = useState('');
   const [streaming, setStreaming] = useState(false);
-  const [error, setError] = useState(null);
+  const [context, setContext] = useState(null);
   const bottomRef = useRef(null);
   const inputRef = useRef(null);
   const abortRef = useRef(null);
+  const greetedRef = useRef(coachMessages.length > 0); // don't re-greet mid-session
+  const [historyLoaded, setHistoryLoaded] = useState(false);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -54,41 +69,81 @@ export default function CoachPanel() {
     return () => abortRef.current?.abort();
   }, []);
 
-  const sendMessage = async () => {
-    const text = input.trim();
-    if (!text || streaming) return;
+  // Restore the persisted conversation (users/{uid}.agentChat) on first open,
+  // so the agent keeps its record of the user across refreshes and sessions.
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      if (useUiStore.getState().coachMessages.length === 0) {
+        const hist = await loadAgentChat();
+        if (!alive) return;
+        if (hist.length > 0) {
+          useUiStore.getState().setCoachMessages(hist);
+          greetedRef.current = true; // a greeting already exists in history
+        }
+      }
+      if (alive) setHistoryLoaded(true);
+    })();
+    return () => { alive = false; };
+  }, []);
 
-    setInput('');
-    setError(null);
+  // Build the personal context once per open (chat keeps working if the user
+  // keeps the panel open across a page change — context refreshes per send).
+  useEffect(() => {
+    let alive = true;
+    buildAgentContext().then((ctx) => { if (alive) setContext(ctx); });
+    return () => { alive = false; };
+  }, []);
 
-    const userMsg = { role: 'user', content: text };
-    appendCoachMessage(userMsg);
+  // Personalized greeting — only when there is genuinely no prior conversation.
+  useEffect(() => {
+    if (!historyLoaded || greetedRef.current || !context) return;
+    greetedRef.current = true;
+    runStream([{ role: 'user', content: GREETING_INSTRUCTION }]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [context, historyLoaded]);
 
-    // Add empty assistant message that we'll stream into
+  const runStream = async (history) => {
+    setStreaming(true);
     appendCoachMessage({ role: 'assistant', content: '', streaming: true });
 
-    const history = [...coachMessages, userMsg].slice(-10);
-    setStreaming(true);
+    let ctx = context;
+    try { ctx = await buildAgentContext(); setContext(ctx); } catch { /* keep stale ctx */ }
+    if (!ctx) {
+      setStreaming(false);
+      updateLastCoachMessage("I couldn't load your profile just now — try again in a moment. 🌿");
+      return;
+    }
 
     let accumulated = '';
-
-    abortRef.current = streamCoachReply(
+    abortRef.current = streamAgentReply(
       history,
+      ctx,
       (token) => {
         accumulated += token;
         updateLastCoachMessage(accumulated);
       },
       () => {
         setStreaming(false);
-        // Remove streaming flag
         updateLastCoachMessage(accumulated);
+        saveAgentChat(useUiStore.getState().coachMessages);
       },
-      (err) => {
+      () => {
         setStreaming(false);
         updateLastCoachMessage("Sorry, I'm having trouble connecting right now. Try again in a moment! 🌿");
-        setError('Connection error');
-      }
+      },
     );
+  };
+
+  const sendMessage = async () => {
+    const text = input.trim();
+    if (!text || streaming) return;
+
+    setInput('');
+    const userMsg = { role: 'user', content: text };
+    appendCoachMessage(userMsg);
+    const history = [...coachMessages, userMsg].slice(-10);
+    await runStream(history);
   };
 
   const handleKeyDown = (e) => {
@@ -98,11 +153,34 @@ export default function CoachPanel() {
     }
   };
 
-  const SUGGESTED = [
-    '💡 Give me a tip for today',
-    '🔥 How do I maintain my streak?',
-    '🌍 What\'s my biggest impact?',
-  ];
+  const handleClear = () => {
+    abortRef.current?.abort();
+    clearCoachHistory();
+    saveAgentChat([]); // wipe the persistent record too
+    greetedRef.current = false;
+    setStreaming(false);
+    // regenerate greeting from fresh context
+    buildAgentContext().then((ctx) => {
+      setContext(ctx);
+      greetedRef.current = true;
+      appendCoachMessage({ role: 'assistant', content: '', streaming: true });
+      let accumulated = '';
+      abortRef.current = streamAgentReply(
+        [{ role: 'user', content: GREETING_INSTRUCTION }],
+        ctx,
+        (token) => { accumulated += token; updateLastCoachMessage(accumulated); },
+        () => {
+          updateLastCoachMessage(accumulated);
+          saveAgentChat(useUiStore.getState().coachMessages);
+        },
+        () => updateLastCoachMessage("Sorry, connection hiccup — try the chat again! 🌿"),
+      );
+    });
+  };
+
+  const dynamicSuggestions = context?.openLesson
+    ? ['Explain this lesson simply', 'Give me a real-world example', 'Quiz me on this']
+    : ['How am I doing?', 'What should I do next?', "What's my biggest impact?"];
 
   // Desktop: slide-in side panel; Mobile: slide-up sheet
   const panelVariants = {
@@ -132,18 +210,23 @@ export default function CoachPanel() {
       {/* Header */}
       <div className={styles.header}>
         <div className={styles.headerInfo}>
-          <div className={styles.headerAvatar}><PremiumIcon icon={Leaf} color="emerald" size={24} /></div>
+          <div className={styles.headerAvatar}>
+            <BrainCircuit size={22} />
+            <span className={styles.liveDot} />
+          </div>
           <div>
-            <h3 className={styles.headerTitle}>EcoSpark Coach</h3>
-            <p className={styles.headerSub}>AI-powered sustainability mentor</p>
+            <h3 className={styles.headerTitle}>EcoSpark Agent</h3>
+            <p className={styles.headerSub}>
+              {context ? `${firstName(context.user.name)}'s personal eco companion · knows your activity` : 'Loading your profile…'}
+            </p>
           </div>
         </div>
         <div className={styles.headerActions}>
-          <button onClick={clearCoachHistory} className={styles.iconBtn} title="Clear chat">
-            <PremiumIcon icon={Trash2} color="slate" size={20} />
+          <button onClick={handleClear} className={styles.iconBtn} title="Clear chat" aria-label="Clear chat">
+            <Trash2 size={18} />
           </button>
-          <button onClick={closeCoach} className={styles.iconBtn} title="Close">
-            <PremiumIcon icon={X} color="slate" size={20} />
+          <button onClick={closeCoach} className={styles.iconBtn} title="Close" aria-label="Close agent">
+            <X size={18} />
           </button>
         </div>
       </div>
@@ -153,19 +236,18 @@ export default function CoachPanel() {
         {coachMessages.map((msg, i) => (
           <ChatMessage key={i} message={msg} />
         ))}
-        {streaming && coachMessages[coachMessages.length - 1]?.content === '' && (
-          <div className={styles.typingIndicator}>
-            <span className={styles.botAvatar}><PremiumIcon icon={Leaf} color="emerald" size={20} /></span>
-            <div className={styles.typingBubble}><TypingDots /></div>
+        {!context && coachMessages.length === 0 && (
+          <div className={styles.contextLoading}>
+            <Loader2 size={16} className={styles.spin} /> Reading your points, streaks and activity…
           </div>
         )}
         <div ref={bottomRef} />
       </div>
 
-      {/* Suggestions (show when only initial message) */}
-      {coachMessages.length === 1 && (
+      {/* Suggestions (only before the first user message) */}
+      {coachMessages.length <= 1 && !streaming && context && (
         <div className={styles.suggestions}>
-          {SUGGESTED.map((s) => (
+          {dynamicSuggestions.map((s) => (
             <button
               key={s}
               className={styles.suggestionChip}
@@ -185,7 +267,7 @@ export default function CoachPanel() {
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="Ask about eco habits, your streak, tips..."
+          placeholder={context?.openLesson ? 'Ask about this lesson…' : `Ask anything, ${firstName(context?.user.name) || 'eco-hero'}…`}
           rows={1}
           disabled={streaming}
         />
@@ -195,7 +277,7 @@ export default function CoachPanel() {
           disabled={!input.trim() || streaming}
           aria-label="Send message"
         >
-          {streaming ? <PremiumIcon icon={Timer} color="slate" size={16} /> : <PremiumIcon icon={Send} color="emerald" size={16} />}
+          {streaming ? <Loader2 size={16} className={styles.spin} /> : <Send size={16} />}
         </button>
       </div>
     </motion.div>

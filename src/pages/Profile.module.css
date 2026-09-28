@@ -1,11 +1,12 @@
 /* src/pages/Profile.module.css */
 
-.page { 
-  display: flex; 
-  flex-direction: column; 
-  gap: 24px; 
-  max-width: 900px; 
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  max-width: 980px;
   width: 100%;
+  margin: 0 auto;
   padding-bottom: 40px;
   position: relative;
 }
@@ -13,12 +14,12 @@
 /* Epic Hero Banner */
 .heroBanner {
   position: absolute;
-  top: -32px; 
+  top: -32px;
   left: -32px;
   right: -32px;
   height: 280px;
-  background: radial-gradient(circle at 50% 0%, rgba(var(--color-primary-rgb), 0.2) 0%, rgba(var(--color-primary-rgb), 0) 60%),
-              linear-gradient(135deg, #1e1b4b, #312e81, #4c1d95, #831843);
+  background: radial-gradient(circle at 50% 0%, rgba(var(--color-primary-rgb), 0.22) 0%, rgba(var(--color-primary-rgb), 0) 60%),
+              linear-gradient(135deg, rgba(124, 58, 237, 0.16), rgba(31, 164, 99, 0.14), rgba(245, 158, 11, 0.10));
   background-size: 200% 200%;
   animation: heroGradientShift 15s ease infinite;
   mask-image: linear-gradient(to bottom, black 30%, transparent 100%);
@@ -69,12 +70,12 @@
 .dashboardCard {
   position: relative;
   z-index: 5;
-  background: rgba(15, 23, 42, 0.6);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border-radius: 24px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: 0 12px 32px rgba(0,0,0,0.3);
+  background: var(--glass-bg-strong);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border-radius: var(--card-radius-lg);
+  border: var(--glass-border);
+  box-shadow: var(--elevation-3);
   padding: 32px;
   display: flex;
   flex-direction: column;
@@ -380,3 +381,34 @@
   cursor: pointer;
 }
 .cancelBtn:hover { background: rgba(255,255,255,0.1); }
+
+/* ── Themed additions ─────────────────────────────────────── */
+
+.weekPill {
+  font-size: 12px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
+  padding: 4px 14px;
+  border-radius: 100px;
+  font-weight: bold;
+}
+
+.referralCodeBox {
+  background: var(--color-surface);
+  border: 1px dashed var(--color-border-strong);
+  padding: 20px;
+  border-radius: 16px;
+  margin-bottom: 16px;
+  width: 100%;
+  text-align: center;
+}
+
+.referralCodeBox span {
+  font-family: var(--font-mono);
+  font-size: 28px;
+  font-weight: 900;
+  letter-spacing: 0.2em;
+  color: var(--color-primary-light);
+  text-shadow: 0 0 18px rgba(var(--color-primary-rgb), 0.4);
+}

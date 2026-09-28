@@ -14,27 +14,27 @@ import { db } from '../lib/firebase';
 export async function awardPointsAndUpdateStreak(userId, taskId, points, impact = {}) {
   const userRef = doc(db, 'users', userId);
   const snap = await getDoc(userRef);
-  
+
   if (!snap.exists()) throw new Error('User not found');
-  
+
   const data = snap.data();
   const now = new Date();
   let newStreak = data.streak || 0;
-  
+
   if (data.lastTaskDate) {
     const lastDate = data.lastTaskDate.toDate();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const lastTaskDay = new Date(lastDate.getFullYear(), lastDate.getMonth(), lastDate.getDate());
-    
+
     const diffTime = today.getTime() - lastTaskDay.getTime();
     const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
-    
+
     if (diffDays === 1) newStreak += 1;
     else if (diffDays > 1) newStreak = 1;
   } else {
     newStreak = 1;
   }
-  
+
   const longestStreak = Math.max(newStreak, data.longestStreak || 0);
 
   await updateDoc(userRef, {
@@ -51,8 +51,126 @@ export async function awardPointsAndUpdateStreak(userId, taskId, points, impact 
     totalWasteSaved: increment(impact.treesEquivalent || 0),
     updatedAt: serverTimestamp()
   });
-  
+
   return { points, newStreak };
+}
+
+/**
+ * Award points for an approved submission exactly once.
+ *
+ * Every caller (AI verification, TaskLogModal, admin review) funnels through
+ * here. The `pointsAwarded` flag is flipped inside the same transaction that
+ * mutates the balance, so a modal closing mid-verification, a retry, or two
+ * listeners firing can never pay out twice — and a verified submission can
+ * never silently fail to pay out because its modal was closed too early.
+ */
+export async function awardSubmissionPoints(userId, submissionId, points, impact = {}) {
+  if (!userId || !submissionId || !points) return { awarded: false, reason: 'invalid-args' };
+
+  const subRef = doc(db, 'submissions', submissionId);
+  const userRef = doc(db, 'users', userId);
+
+  try {
+    const result = await runTransaction(db, async (tx) => {
+      const subSnap = await tx.get(subRef);
+      if (!subSnap.exists()) return { awarded: false, reason: 'no-submission' };
+      const sub = subSnap.data();
+      if (sub.status !== 'approved') return { awarded: false, reason: 'not-approved' };
+      if (sub.pointsAwarded) return { awarded: false, reason: 'already-awarded' };
+
+      const userSnap = await tx.get(userRef);
+      if (!userSnap.exists()) return { awarded: false, reason: 'no-user' };
+      const user = userSnap.data();
+
+      // Streak logic mirrors awardPointsAndUpdateStreak
+      const now = new Date();
+      let newStreak = user.streak || 0;
+      if (user.lastTaskDate) {
+        const lastDate = user.lastTaskDate.toDate();
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const lastTaskDay = new Date(lastDate.getFullYear(), lastDate.getMonth(), lastDate.getDate());
+        const diffDays = Math.round((today.getTime() - lastTaskDay.getTime()) / (1000 * 60 * 60 * 24));
+        if (diffDays === 1) newStreak += 1;
+        else if (diffDays > 1) newStreak = 1;
+      } else {
+        newStreak = 1;
+      }
+      const longestStreak = Math.max(newStreak, user.longestStreak || 0);
+
+      tx.update(userRef, {
+        points: increment(points),
+        lifetimePoints: increment(points),
+        spendableBalance: increment(points),
+        weeklyPoints: increment(points),
+        streak: newStreak,
+        longestStreak,
+        lastTaskDate: serverTimestamp(),
+        totalTasksCompleted: increment(1),
+        totalCO2Saved: increment(impact.co2Saved || 0),
+        totalWaterSaved: increment(impact.waterSaved || 0),
+        totalWasteSaved: increment(impact.wasteSaved || 0),
+        updatedAt: serverTimestamp(),
+      });
+
+      tx.update(subRef, {
+        pointsAwarded: true,
+        pointsAwardedAt: serverTimestamp(),
+        awardedPoints: points,
+        updatedAt: serverTimestamp(),
+      });
+
+      // Legacy history feed read by the Rewards page
+      tx.set(doc(collection(db, 'transactions')), {
+        userId,
+        type: 'earned',
+        amount: points,
+        description: 'Eco-action verified',
+        sourceType: 'task_award',
+        sourceId: submissionId,
+        createdAt: serverTimestamp(),
+      });
+
+      const lbRef = doc(db, 'leaderboard', userId);
+      tx.set(lbRef, {
+        userId,
+        points: increment(points),
+        weeklyPoints: increment(points),
+        streak: newStreak,
+        updatedAt: serverTimestamp(),
+      }, { merge: true });
+
+      return { awarded: true, points, newStreak };
+    });
+
+    if (result.awarded) {
+      // Keep the profile store fresh — the subscribed listener will also pick
+      // this up, but the streak fields matter to UI that reads them directly.
+      try {
+        const { useAuthStore } = await import('../store/authStore');
+        const profile = useAuthStore.getState().profile;
+        if (profile && profile.id === userId) {
+          useAuthStore.getState().setProfile({
+            ...profile,
+            points: (profile.points || 0) + points,
+            lifetimePoints: (profile.lifetimePoints || 0) + points,
+            spendableBalance: (profile.spendableBalance ?? profile.points ?? 0) + points,
+            weeklyPoints: (profile.weeklyPoints || 0) + points,
+            streak: result.newStreak,
+            totalTasksCompleted: (profile.totalTasksCompleted || 0) + 1,
+            totalCO2Saved: (profile.totalCO2Saved || 0) + (impact.co2Saved || 0),
+            totalWaterSaved: (profile.totalWaterSaved || 0) + (impact.waterSaved || 0),
+            totalWasteSaved: (profile.totalWasteSaved || 0) + (impact.wasteSaved || 0),
+          });
+        }
+      } catch { /* store not mounted — snapshot will sync */ }
+    }
+    return result;
+  } catch (err) {
+    // Transaction conflicts resolve on Firestore's internal retry; anything
+    // surfacing here is real. Log loudly but never break the caller's UI.
+    console.error('[awardSubmissionPoints]', err);
+    return { awarded: false, reason: 'error', error: err };
+  }
 }
 
 export async function incrementGlobalUserCount() {
@@ -247,6 +365,25 @@ export async function createSubmission(userId, taskId, imageUrl, taskMeta = {}) 
 export function subscribeSubmission(submissionId, callback) {
   return onSnapshot(doc(db, 'submissions', submissionId), (snap) => {
     callback(snap.exists() ? { id: snap.id, ...snap.data() } : null);
+  });
+}
+
+/** Live feed of this user's recent submissions (dashboard verification card). */
+export function subscribeUserSubmissions(userId, callback, limitCount = 8) {
+  const q = query(collection(db, 'submissions'), where('userId', '==', userId));
+  return onSnapshot(q, (snap) => {
+    const results = snap.docs
+      .map((d) => ({ id: d.id, ...d.data() }))
+      .sort((a, b) => {
+        const ta = a.createdAt?.toMillis?.() || 0;
+        const tb = b.createdAt?.toMillis?.() || 0;
+        return tb - ta;
+      })
+      .slice(0, limitCount);
+    callback(results);
+  }, (err) => {
+    console.error('[subscribeUserSubmissions]', err);
+    callback([]);
   });
 }
 

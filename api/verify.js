@@ -7,7 +7,18 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import { db, FieldValue } from './_lib/firebaseAdmin.js';
 import { requireUser } from './_lib/auth.js';
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+// Accept either env var name — Vercel projects have historically configured
+// the key under either name, and a missing key must fail loudly, not silently.
+const GEMINI_KEY = process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY;
+const genAI = new GoogleGenerativeAI(GEMINI_KEY);
+
+// Current-generation flash models, tried in order — 1.5-family models are
+// retired on new API keys and 404, so they must not be first.
+const FALLBACK_MODELS = [
+  'gemini-2.5-flash',
+  'gemini-2.5-flash-lite',
+  'gemini-2.0-flash',
+];
 
 async function fetchImageAsBase64(url) {
   if (url.startsWith('data:image/')) {
@@ -35,26 +46,33 @@ async function fetchImageAsBase64(url) {
 }
 
 async function callGeminiWithRetry(imagePart, prompt, maxRetries = 2) {
-  // Use gemini-1.5-flash for highly stable, fast reasoning and generous free-tier rate limits without 503s
-  const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
-
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 12000);
 
     try {
-      const result = await model.generateContent([
-        {
-          text: `${prompt}\n\nRespond ONLY with a JSON object like this (no markdown, no extra text):\n{"approved": true/false, "confidence": 0.0-1.0, "reason": "one sentence explanation"}`,
-        },
-        imagePart,
-      ]);
-      clearTimeout(timeout);
-
-      const text = result.response.text().trim();
-      // Strip markdown code fences if present
-      const jsonStr = text.replace(/```json?\n?/g, '').replace(/```/g, '').trim();
-      return JSON.parse(jsonStr);
+      // Try each fallback model once per attempt — a retired model must not
+      // consume the whole retry budget.
+      let lastModelError = null;
+      for (const modelName of FALLBACK_MODELS) {
+        try {
+          const model = genAI.getGenerativeModel({ model: modelName });
+          const result = await model.generateContent([
+            {
+              text: `${prompt}\n\nRespond ONLY with a JSON object like this (no markdown, no extra text):\n{"approved": true/false, "confidence": 0.0-1.0, "reason": "one sentence explanation"}`,
+            },
+            imagePart,
+          ]);
+          const text = result.response.text().trim();
+          const jsonStr = text.replace(/```json?\n?/g, '').replace(/```/g, '').trim();
+          return JSON.parse(jsonStr);
+        } catch (modelErr) {
+          lastModelError = modelErr;
+          const isModelGone = modelErr.status === 404 || String(modelErr.message || '').includes('not found');
+          if (!isModelGone) throw modelErr; // rate limits etc. → outer retry logic
+        }
+      }
+      throw lastModelError;
     } catch (err) {
       clearTimeout(timeout);
 

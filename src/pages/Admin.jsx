@@ -3,13 +3,14 @@ import { motion } from 'framer-motion';
 import { useAuthStore } from '../store/authStore';
 import { getFlaggedSubmissions, updateSubmissionStatus, resolveReport, getTasks, getRewards, createNotification, createOrGetChat } from '../services/firestoreService';
 import { adminReviewSubmission } from '../services/economyService';
+import { awardSubmissionPoints } from '../services/firestoreService';
 import { getAdminUsers, adminUpdateUserPoints, adminUpdateUserProfile, adminAwardFrame, adminBanUser, adminDeletePost, getReportedPosts, getAdminStats, getAdminChartData, getResolvedSubmissions, adminDeleteSubmission, adminCreateTask, adminUpdateTask, adminDeleteTask, adminCreateReward, adminUpdateReward, adminDeleteReward, getGlobalSettings, updateGlobalSettings, getFrameRequests, resolveFrameRequest, adminForceWeeklyReset, adminClearAllPastSubmissions, adminGetDuplicateTasks, adminDeleteTasksBulk, adminDeleteUserDeep } from '../services/adminService';
 import { sendPasswordResetEmail } from 'firebase/auth';
 import { auth } from '../lib/firebase';
 import { Navigate, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import styles from './Admin.module.css';
-import { FileText, Shield, Users, Globe, Leaf, Ban, CheckSquare, Sparkles, XCircle, AlertTriangle, Trash2, Inbox, Crown, Diamond, Medal, Save, MoreVertical, Edit2, Coins, Key, MessageSquare, UserCheck, UserX } from 'lucide-react';
+import { FileText, Shield, Users, Globe, Leaf, Ban, CheckSquare, Sparkles, XCircle, AlertTriangle, Trash2, Inbox, Crown, Diamond, Medal, Save, MoreVertical, Edit2, Coins, Key, MessageSquare, UserCheck, UserX, GraduationCap, Dices, Swords } from 'lucide-react';
 import PremiumIcon from '../components/common/PremiumIcon';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { REWARDS_DB } from '../constants/rewards';
@@ -21,8 +22,47 @@ const TABS = [
   { id: 'past', label: 'Past Submissions' },
   { id: 'tasks', label: 'Tasks' },
   { id: 'reward-toggles', label: 'Reward Toggles' },
+  { id: 'payouts', label: 'Payouts' },
   { id: 'settings', label: 'Settings' }
 ];
+
+/** Premium platform-feature switch card (Settings tab). */
+function FeatureToggle({ icon: Icon, accent, title, desc, checked, onChange, children }) {
+  return (
+    <div className={`${styles.featureCard} ${checked ? styles.on : styles.off}`} style={{ '--feature-accent': accent, flexWrap: 'wrap' }}>
+      <div className={styles.featureIconChip}><Icon size={22} /></div>
+      <div className={styles.featureText}>
+        <h4 className={styles.featureTitle}>{title}</h4>
+        <p className={styles.featureDesc}>{desc}</p>
+      </div>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={checked}
+        aria-label={`Toggle ${title}`}
+        className={`${styles.switch} ${checked ? styles.on : ''}`}
+        onClick={() => onChange(!checked)}
+      />
+      {checked && children}
+    </div>
+  );
+}
+
+function SubToggle({ label, checked, onChange }) {
+  return (
+    <div className={styles.subToggle}>
+      <span>{label}</span>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={checked}
+        aria-label={`Toggle ${label}`}
+        className={`${styles.subSwitch} ${checked ? styles.on : ''}`}
+        onClick={() => onChange(!checked)}
+      />
+    </div>
+  );
+}
 
 export default function Admin() {
   const { profile } = useAuthStore();
@@ -51,6 +91,8 @@ export default function Admin() {
   const [directAward, setDirectAward] = useState({ userId: '', frameId: 'frame-prime' });
   const [taskModal, setTaskModal] = useState({ open: false, task: null });
   const [rewardModal, setRewardModal] = useState({ open: false, reward: null });
+  const [payoutsData, setPayoutsData] = useState([]);
+  const [payoutTxid, setPayoutTxid] = useState({ id: null, value: '' });
   const [duplicateGroups, setDuplicateGroups] = useState(null); // null=not scanned, []=no dupes, [...]= groups
   const [scanningDupes, setScanningDupes] = useState(false);
   const [clearingAll, setClearingAll] = useState(false);
@@ -106,6 +148,9 @@ export default function Admin() {
       } else if (tab === 'reward-toggles' || tab === 'settings') {
         const setg = await getGlobalSettings();
         setSettingsData(setg || {});
+      } else if (tab === 'payouts') {
+        const { adminListPayouts } = await import('../services/walletService');
+        setPayoutsData(await adminListPayouts());
       }
     } catch (err) {
       toast.error(err.message || 'Failed to load data');
@@ -129,33 +174,20 @@ export default function Admin() {
 
       if (status === 'approved') {
         const points = sub.points || 50;
-        
-        // Add points and impact stats
-        const userRef = doc(db, 'users', sub.userId);
-        await updateDoc(userRef, {
-          points: increment(points),
-          lifetimePoints: increment(points),
-          spendableBalance: increment(points),
-          totalTasksCompleted: increment(1),
-          totalCO2Saved: increment(sub.co2 || 0),
-          totalWaterSaved: increment(sub.water || 0),
-          totalWasteSaved: increment(sub.waste || 0),
-          updatedAt: serverTimestamp()
+
+        // Idempotent payout — a double-click or an already-paid AI approval
+        // cannot credit twice.
+        const result = await awardSubmissionPoints(sub.userId, sub.id, points, {
+          co2Saved: sub.co2 || 0,
+          waterSaved: sub.water || 0,
+          wasteSaved: sub.waste || 0,
         });
 
-        // Add transaction
-        const txRef = doc(collection(db, 'transactions'));
-        await setDoc(txRef, {
-          userId: sub.userId,
-          type: 'task_reward',
-          amount: points,
-          description: `Task Approved: ${sub.title || 'Task'}`,
-          createdAt: serverTimestamp(),
-        });
-
-        await createNotification(sub.userId, 'system', {
-          message: `Your task verification was approved. You've been credited ${points} points.`,
-        });
+        if (result.awarded) {
+          await createNotification(sub.userId, 'system', {
+            message: `Your task verification was approved. You've been credited ${points} points.`,
+          });
+        }
       }
 
       setFlagged((prev) => prev.filter((s) => s.id !== sub.id));
@@ -416,8 +448,36 @@ export default function Admin() {
     }
   };
 
-  const handleUpdateRole = async (userId, newRole) => {
+  // --- Wallet payouts ---
+  const refreshPayouts = async () => {
+    const { adminListPayouts } = await import('../services/walletService');
+    setPayoutsData(await adminListPayouts());
+  };
+
+  const handlePayoutPaid = async (payoutId) => {
     try {
+      const { adminMarkPayoutPaid } = await import('../services/walletService');
+      await adminMarkPayoutPaid(payoutId, payoutTxid.value);
+      toast.success('Payout marked as paid');
+      setPayoutTxid({ id: null, value: '' });
+      await refreshPayouts();
+    } catch (err) {
+      toast.error(err.message || 'Failed to mark paid');
+    }
+  };
+
+  const handlePayoutReject = async (payoutId) => {
+    try {
+      const { adminRejectPayout } = await import('../services/walletService');
+      const res = await adminRejectPayout(payoutId, 'Rejected by staff — points refunded');
+      toast.success(`Payout rejected · ${res.refunded?.toLocaleString()} points refunded`);
+      await refreshPayouts();
+    } catch (err) {
+      toast.error(err.message || 'Failed to reject payout');
+    }
+  };
+
+  const handleUpdateRole = async (userId, newRole) => {    try {
       await adminUpdateUserProfile(userId, { role: newRole });
       setUsers(users.map(u => u.id === userId ? { ...u, role: newRole } : u));
       toast.success(`User role updated to ${newRole}`);
@@ -965,6 +1025,100 @@ export default function Admin() {
             </div>
           )}
 
+          {/* TAB: WALLET PAYOUTS */}
+          {activeTab === 'payouts' && (
+            <div className={styles.chartCard}>
+              <h3 className={styles.chartTitle}>Crypto Payout Requests</h3>
+              <p style={{ margin: '0 0 18px', fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)' }}>
+                Points are locked the moment a student requests a payout. Mark a request <strong style={{ color: '#34D399' }}>paid</strong> after
+                sending the transfer (paste the txid), or <strong style={{ color: 'var(--color-error)' }}>reject</strong> it — rejection refunds the points automatically.
+              </p>
+              {payoutsData.length === 0 ? (
+                <div style={{ padding: '28px', textAlign: 'center', color: 'var(--color-text-tertiary)', fontSize: 'var(--text-sm)', border: '1px dashed var(--color-border)', borderRadius: '12px' }}>
+                  No payout requests yet.
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  {payoutsData.map((p) => (
+                    <div key={p.id} style={{
+                      display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap',
+                      background: 'var(--color-surface-hover)', border: '1px solid var(--color-border)',
+                      borderLeft: `3px solid ${p.status === 'pending' ? 'var(--color-gold)' : p.status === 'paid' ? '#34D399' : 'var(--color-text-tertiary)'}`,
+                      borderRadius: '12px', padding: '14px 16px',
+                    }}>
+                      <div style={{ flex: 1, minWidth: '220px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                          <strong style={{ color: 'var(--color-text)', fontSize: 'var(--text-sm)' }}>
+                            ${(Number(p.usd) || 0).toFixed(2)}
+                          </strong>
+                          <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)' }}>
+                            {p.points?.toLocaleString()} pts → {(p.ticker || p.coin || '').toUpperCase()}
+                          </span>
+                          <span style={{
+                            fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em',
+                            color: p.status === 'pending' ? 'var(--color-gold)' : p.status === 'paid' ? '#34D399' : 'var(--color-text-tertiary)',
+                            border: '1px solid currentColor', borderRadius: '999px', padding: '1px 8px',
+                          }}>{p.status}</span>
+                        </div>
+                        <p style={{ margin: '3px 0 0', fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)' }}>
+                          {p.email || p.userId} · {(p.network || p.coin || '').toUpperCase()}
+                        </p>
+                        <p style={{ margin: '3px 0 0', fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--color-text-secondary)', wordBreak: 'break-all' }}>
+                          {p.address}
+                        </p>
+                        {p.status === 'paid' && p.txid && (
+                          <p style={{ margin: '3px 0 0', fontFamily: 'var(--font-mono)', fontSize: '11px', color: '#34D399', wordBreak: 'break-all' }}>
+                            txid: {p.txid}
+                          </p>
+                        )}
+                        {p.status === 'rejected' && p.rejectReason && (
+                          <p style={{ margin: '3px 0 0', fontSize: '11px', color: 'var(--color-error)' }}>{p.rejectReason}</p>
+                        )}
+                      </div>
+
+                      {p.status === 'pending' && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', minWidth: '240px' }}>
+                          {payoutTxid.id === p.id ? (
+                            <>
+                              <input
+                                autoFocus
+                                value={payoutTxid.value}
+                                onChange={e => setPayoutTxid({ id: p.id, value: e.target.value })}
+                                placeholder="Transaction id (txid)…"
+                                style={{
+                                  background: 'var(--color-surface)', border: '1px solid var(--color-border-strong)',
+                                  borderRadius: '8px', padding: '8px 12px', fontSize: 'var(--text-xs)',
+                                  color: 'var(--color-text)', fontFamily: 'var(--font-mono)',
+                                }}
+                              />
+                              <div style={{ display: 'flex', gap: '8px' }}>
+                                <button onClick={() => handlePayoutPaid(p.id)} className={styles.approveBtn} style={{ flex: 1, padding: '8px', fontSize: 'var(--text-xs)' }}>
+                                  <PremiumIcon icon={CheckSquare} color="emerald" size={14} /> Confirm paid
+                                </button>
+                                <button onClick={() => setPayoutTxid({ id: null, value: '' })} className={styles.rejectBtn} style={{ padding: '8px 12px', fontSize: 'var(--text-xs)' }}>
+                                  Cancel
+                                </button>
+                              </div>
+                            </>
+                          ) : (
+                            <div style={{ display: 'flex', gap: '8px' }}>
+                              <button onClick={() => setPayoutTxid({ id: p.id, value: '' })} className={styles.approveBtn} style={{ flex: 1, padding: '8px', fontSize: 'var(--text-xs)' }}>
+                                <PremiumIcon icon={CheckSquare} color="emerald" size={14} /> Mark paid
+                              </button>
+                              <button onClick={() => handlePayoutReject(p.id)} className={styles.rejectBtn} style={{ flex: 1, padding: '8px', fontSize: 'var(--text-xs)' }}>
+                                <PremiumIcon icon={XCircle} color="ruby" size={14} /> Reject & refund
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* TAB 9: GLOBAL SETTINGS */}
           {activeTab === 'settings' && settingsData && (
             <form onSubmit={handleSaveSettings} className={styles.chartCard} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -994,46 +1148,92 @@ export default function Admin() {
                 </label>
               </div>
 
-              <div className={styles.inputGroup}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: 'var(--text-base)', color: 'var(--color-text)' }}>
-                  <input 
-                    type="checkbox" 
-                    checked={settingsData.arenaEnabled ?? true} 
-                    onChange={e => setSettingsData({...settingsData, arenaEnabled: e.target.checked})}
-                    style={{ width: '20px', height: '20px', accentColor: 'var(--color-ruby)' }}
-                  />
-                  Enable Arena (Global Kill Switch)
-                </label>
-              </div>
+              {/* ── PLATFORM FEATURES — premium toggles ── */}
+              <div>
+                <h4 style={{ margin: '0 0 4px', fontSize: 'var(--text-sm)', fontWeight: 700, color: 'var(--color-text)', textTransform: 'uppercase', letterSpacing: '1px' }}>Platform Features</h4>
+                <p style={{ margin: '0 0 14px', fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)' }}>
+                  Switch entire experiences on or off for every student. Changes apply after saving.
+                </p>
+                <div className={styles.featureGrid}>
+                  <FeatureToggle
+                    icon={Swords}
+                    accent="#F97316"
+                    title="Arena"
+                    desc="Prediction markets, perps trading desk and competitions."
+                    checked={settingsData.arenaEnabled ?? true}
+                    onChange={v => setSettingsData({ ...settingsData, arenaEnabled: v })}
+                  >
+                    <div className={styles.subToggles}>
+                      <SubToggle label="The Oracle — live prediction markets" checked={settingsData.arenaOracleEnabled ?? true} onChange={v => setSettingsData({ ...settingsData, arenaOracleEnabled: v })} />
+                      <SubToggle label="Trivia tournaments" checked={settingsData.arenaTriviaEnabled ?? true} onChange={v => setSettingsData({ ...settingsData, arenaTriviaEnabled: v })} />
+                      <SubToggle label="Yield farming pool" checked={settingsData.arenaStakingEnabled ?? true} onChange={v => setSettingsData({ ...settingsData, arenaStakingEnabled: v })} />
+                    </div>
+                  </FeatureToggle>
 
-              {/* ARENA SUB-SECTION TOGGLES */}
-              <div style={{ paddingLeft: '32px', display: 'flex', flexDirection: 'column', gap: '12px', opacity: (settingsData.arenaEnabled ?? true) ? 1 : 0.5, pointerEvents: (settingsData.arenaEnabled ?? true) ? 'auto' : 'none' }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: 'var(--text-sm)', color: 'var(--color-text)' }}>
-                  <input type="checkbox" checked={settingsData.arenaOracleEnabled ?? true} onChange={e => setSettingsData({...settingsData, arenaOracleEnabled: e.target.checked})} style={{ width: '16px', height: '16px' }} />
-                  Enable The Oracle
-                </label>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: 'var(--text-sm)', color: 'var(--color-text)' }}>
-                  <input type="checkbox" checked={settingsData.arenaTriviaEnabled ?? true} onChange={e => setSettingsData({...settingsData, arenaTriviaEnabled: e.target.checked})} style={{ width: '16px', height: '16px' }} />
-                  Enable Trivia Tournaments
-                </label>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: 'var(--text-sm)', color: 'var(--color-text)' }}>
-                  <input type="checkbox" checked={settingsData.arenaSpinEnabled ?? true} onChange={e => setSettingsData({...settingsData, arenaSpinEnabled: e.target.checked})} style={{ width: '16px', height: '16px' }} />
-                  Enable Spin to Win
-                </label>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: 'var(--text-sm)', color: 'var(--color-text)' }}>
-                  <input type="checkbox" checked={settingsData.arenaStakingEnabled ?? true} onChange={e => setSettingsData({...settingsData, arenaStakingEnabled: e.target.checked})} style={{ width: '16px', height: '16px' }} />
-                  Enable Yield Farming Pool
-                </label>
+                  <FeatureToggle
+                    icon={Dices}
+                    accent="#FBBF24"
+                    title="Casino"
+                    desc="11 provably-fair games — Dice, Mines, Plinko, Crash and more."
+                    checked={settingsData.casinoEnabled ?? true}
+                    onChange={v => setSettingsData({ ...settingsData, casinoEnabled: v })}
+                  />
+
+                  <FeatureToggle
+                    icon={GraduationCap}
+                    accent="#2DD4A7"
+                    title="Learn Hub"
+                    desc="6 expert courses, quizzes, XP levels and the personal Learn Agent."
+                    checked={settingsData.learnEnabled ?? true}
+                    onChange={v => setSettingsData({ ...settingsData, learnEnabled: v })}
+                  />
+                </div>
               </div>
               
               <div className={styles.inputGroup} style={{ maxWidth: '300px' }}>
                 <label>Global Points Multiplier (e.g. 1.5 for +50% points)</label>
-                <input 
-                  type="number" 
-                  step="0.1" 
-                  value={settingsData.pointsMultiplier || 1} 
+                <input
+                  type="number"
+                  step="0.1"
+                  value={settingsData.pointsMultiplier || 1}
                   onChange={e => setSettingsData({...settingsData, pointsMultiplier: parseFloat(e.target.value)})}
                 />
+              </div>
+
+              {/* WALLET PAYOUT ECONOMICS */}
+              <div style={{ padding: '20px 24px', background: 'rgba(45,212,167,0.04)', border: '1px solid rgba(45,212,167,0.18)', borderRadius: '14px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
+                  <PremiumIcon icon={Coins} color="emerald" size={20} />
+                  <h4 style={{ margin: 0, fontSize: 'var(--text-base)', fontWeight: 700, color: 'var(--color-text)' }}>Wallet payout economics</h4>
+                </div>
+                <p style={{ margin: '0 0 16px', fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)' }}>
+                  How many US dollars 10,000 points are worth, and the smallest payout a student can request. Requests below the minimum are blocked.
+                </p>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '14px' }}>
+                  <div className={styles.inputGroup} style={{ margin: 0 }}>
+                    <label>USD per 10,000 points (e.g. 0.05)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0.01"
+                      value={settingsData.payoutUsdPer10k ?? 0.05}
+                      onChange={e => setSettingsData({ ...settingsData, payoutUsdPer10k: parseFloat(e.target.value) || 0.05 })}
+                    />
+                  </div>
+                  <div className={styles.inputGroup} style={{ margin: 0 }}>
+                    <label>Minimum payout (USD)</label>
+                    <input
+                      type="number"
+                      step="0.5"
+                      min="0.5"
+                      value={settingsData.payoutMinUsd ?? 1}
+                      onChange={e => setSettingsData({ ...settingsData, payoutMinUsd: parseFloat(e.target.value) || 1 })}
+                    />
+                  </div>
+                </div>
+                <p style={{ margin: '12px 0 0', fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)' }}>
+                  At the values above: {10000 .toLocaleString()} pts = ${(settingsData.payoutUsdPer10k ?? 0.05).toFixed(2)} · minimum = {Math.ceil(((settingsData.payoutMinUsd ?? 1) / (settingsData.payoutUsdPer10k ?? 0.05)) * 10000).toLocaleString()} points.
+                </p>
               </div>
 
               {/* LANDING PAGE STYLE TOGGLE */}

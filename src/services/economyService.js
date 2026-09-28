@@ -31,17 +31,20 @@ export async function redeemReward(rewardId) {
 
   const profile = snap.data();
   const bal = profile.spendableBalance ?? profile.points ?? 0;
-  
+
   if (bal < reward.pointCost) throw new Error('Not enough points');
-  if (profile.inventory?.includes(reward.id)) throw new Error('Already owned');
+  // inventory exists in two historical shapes: a flat id array and a
+  // categorized object ({frames: [], glows: [], ...}). Check both.
+  const nestedType = reward.type === 'entry' ? 'entries' : `${reward.type}s`;
+  const ownedFlat = Array.isArray(profile.inventory) && profile.inventory.includes(rewardId);
+  const ownedNested = !Array.isArray(profile.inventory) && (profile.inventory?.[nestedType] || []).includes(rewardId);
+  if (ownedFlat || ownedNested) throw new Error('Already owned');
 
   const updates = {
     spendableBalance: increment(-reward.pointCost),
     updatedAt: serverTimestamp()
   };
 
-  const nestedType = reward.type === 'entry' ? 'entries' : `${reward.type}s`;
-  
   if (Array.isArray(profile.inventory)) {
     updates.inventory = arrayUnion(reward.id);
     if (reward.type === 'frame') {

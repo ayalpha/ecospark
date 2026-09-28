@@ -7,7 +7,7 @@ import { useAuthStore } from '../../store/authStore';
 import { useUiStore } from '../../store/uiStore';
 import { subscribeConversations } from '../../services/firestoreService';
 import { useEffect, useState, useRef } from 'react';
-import { Home, CheckSquare, Trophy, Gift, Globe, MessageCircle, Info, ShieldAlert, LogOut, Flame, Zap } from 'lucide-react';
+import { Home, CheckSquare, Trophy, Gift, Globe, MessageCircle, Info, ShieldAlert, LogOut, Flame, Zap, GraduationCap, Wallet } from 'lucide-react';
 import Avatar from '../common/Avatar';
 import PointsReadout from './PointsReadout';
 import styles from './Sidebar.module.css';
@@ -15,8 +15,10 @@ import styles from './Sidebar.module.css';
 const PRIMARY_NAV = [
   { path: '/', icon: Home, label: 'Home', end: true },
   { path: '/tasks', icon: CheckSquare, label: 'Tasks' },
+  { path: '/learn', icon: GraduationCap, label: 'Learn' },
   { path: '/leaderboard', icon: Trophy, label: 'Leaderboard' },
   { path: '/rewards', icon: Gift, label: 'Rewards' },
+  { path: '/wallet', icon: Wallet, label: 'Wallet' },
   { path: '/arena', icon: Flame, label: 'Arena' },
 ];
 
@@ -32,8 +34,7 @@ const MANAGE_NAV = [
 
 import { useSettingsStore } from '../../store/settingsStore';
 
-function NavItem({ item, isActive, children, onClick }) {
-  return (
+function NavItem({ item, isActive, children, onClick }) {  return (
     <NavLink
       to={item.path}
       end={item.end}
@@ -69,7 +70,11 @@ export default function Sidebar() {
   const [menuOpen, setMenuOpen] = useState(false);
   const accountRef = useRef(null);
 
-  const visiblePrimary = PRIMARY_NAV.filter(item => item.path !== '/arena' || arenaEnabled);
+  const visiblePrimary = PRIMARY_NAV.filter(item => {
+    if (item.path === '/arena' && !arenaEnabled) return false;
+    if (item.path === '/learn' && !(settings.learnEnabled ?? true)) return false;
+    return true;
+  });
 
   useEffect(() => {
     if (!profile?.id) return;

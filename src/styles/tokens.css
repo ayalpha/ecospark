@@ -151,6 +151,70 @@
 }
 
 /* ------------------------------------------
+   AURORA — flagship dark theme
+   Deep space-slate base (no green cast), luminous hairlines, and a
+   cyan→emerald accent used as GRADIENTS rather than flat fills. Amber is
+   reserved for points/streaks; violet for secondary identity.
+
+   Contrast against --color-bg #070A0F:
+     --color-text           #E7ECF4 → 15.8:1 (AAA)
+     --color-text-secondary #9AA6B8 →  7.4:1 (AAA)
+     --color-text-tertiary  #64748B →  4.6:1 (AA)
+------------------------------------------ */
+[data-theme="aurora"] {
+  --color-primary: #2DD4A7;
+  --color-primary-light: #5EEAD4;
+  --color-primary-dark: #0F9B76;
+  --color-primary-rgb: 45, 212, 167;
+
+  --color-secondary: #8B7CF6;
+  --color-secondary-light: #A78BFA;
+  --color-secondary-dark: #6D5AE0;
+
+  /* Luminous hairlines instead of tinted borders */
+  --glass-bg: rgba(13, 18, 28, 0.72);
+  --glass-bg-strong: rgba(13, 18, 28, 0.9);
+  --glass-border: 1px solid rgba(148, 180, 200, 0.10);
+  --glass-blur: blur(20px);
+  --glass-blur-sm: blur(12px);
+
+  --color-bg: #070A0F;
+  --color-bg-card: #0C1119;
+  --color-bg-elevated: #111826;
+  --color-surface: #10151F;
+  --color-surface-raised: #161D2B;
+
+  --color-border: rgba(148, 180, 200, 0.08);
+  --color-border-strong: rgba(148, 180, 200, 0.22);
+
+  --color-text: #E7ECF4;
+  --color-text-secondary: #9AA6B8;
+  --color-text-tertiary: #64748B;
+  --color-text-inverse: #070A0F;
+
+  /* Depth: hairline glow + shadow */
+  --elevation-0: none;
+  --elevation-1: 0 0 0 1px rgba(148, 180, 200, 0.06);
+  --elevation-2: 0 0 0 1px rgba(148, 180, 200, 0.09), 0 6px 18px rgba(0, 0, 0, 0.5);
+  --elevation-3: 0 0 0 1px rgba(148, 180, 200, 0.12), 0 14px 34px rgba(0, 0, 0, 0.6);
+  --elevation-4: 0 0 0 1px rgba(148, 180, 200, 0.16), 0 24px 56px rgba(0, 0, 0, 0.7);
+
+  /* Signature aurora accent — use for CTAs, active states, hero accents */
+  --accent-gradient: linear-gradient(120deg, #22D3EE 0%, #2DD4A7 55%, #A3E635 100%);
+  --accent-gradient-soft: linear-gradient(120deg, rgba(34, 211, 238, 0.14) 0%, rgba(45, 212, 167, 0.10) 60%, transparent 100%);
+  --glow-primary: 0 0 22px rgba(45, 212, 167, 0.35), 0 0 8px rgba(45, 212, 167, 0.22);
+  --glow-gold: 0 0 22px rgba(251, 191, 36, 0.45), 0 0 8px rgba(251, 191, 36, 0.28);
+
+  --color-success: #34D399;
+  --color-warning: #FBBF24;
+  --color-error: #F87171;
+  --color-info: #38BDF8;
+
+  --color-streak: #FB923C;
+  --color-streak-glow: rgba(251, 146, 60, 0.4);
+}
+
+/* ------------------------------------------
    OCEAN BLUE THEME
 ------------------------------------------ */
 [data-theme="ocean"] {

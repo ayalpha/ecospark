@@ -1,6 +1,11 @@
 // src/pages/Settings.jsx
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import {
+  Palette, Accessibility, Bell, Lock, Settings2, KeyRound, Mail, Download,
+  Trash2, SunMoon, Contrast, Smartphone, Flame, Globe2, Trophy, Sparkles,
+  Type, Film,
+} from 'lucide-react';
 import { useUiStore } from '../store/uiStore';
 import { useAuthStore } from '../store/authStore';
 import { updateUserProfile } from '../services/firestoreService';
@@ -56,11 +61,11 @@ function SelectRow({ icon, label, value, options, onChange }) {
 }
 
 const TABS = [
-  { id: 'appearance', label: 'Appearance', icon: '🎨' },
-  { id: 'accessibility', label: 'Accessibility', icon: '♿' },
-  { id: 'notifications', label: 'Notifications', icon: '🔔' },
-  { id: 'privacy', label: 'Privacy', icon: '🔒' },
-  { id: 'account', label: 'Account Actions', icon: '⚙️' },
+  { id: 'appearance', label: 'Appearance', icon: <Palette size={18} /> },
+  { id: 'accessibility', label: 'Accessibility', icon: <Accessibility size={18} /> },
+  { id: 'notifications', label: 'Notifications', icon: <Bell size={18} /> },
+  { id: 'privacy', label: 'Privacy', icon: <Lock size={18} /> },
+  { id: 'account', label: 'Account Actions', icon: <Settings2 size={18} /> },
 ];
 
 export default function Settings() {
@@ -90,7 +95,9 @@ export default function Settings() {
   const handleAction = async (actionName) => {
     if (actionName === 'Change Password') {
       try {
-        await sendPasswordResetEmail(auth, user.email);
+        await sendPasswordResetEmail(auth, user.email, {
+          url: `${window.location.origin}/auth`,
+        });
         toast.success(`Password reset email sent to ${user.email}`);
       } catch (err) {
         toast.error('Failed to send reset email: ' + err.message);
@@ -102,7 +109,10 @@ export default function Settings() {
       const newEmail = prompt('Enter your new email address:');
       if (!newEmail || newEmail.trim() === '') return;
       try {
-        await verifyBeforeUpdateEmail(auth.currentUser, newEmail.trim());
+        await verifyBeforeUpdateEmail(auth.currentUser, newEmail.trim(), {
+          url: `${window.location.origin}/auth?verified=1`,
+          handleCodeInApp: false,
+        });
         toast.success(`Verification link sent to ${newEmail}`);
       } catch (err) {
         if (err.code === 'auth/requires-recent-login') {
@@ -142,7 +152,7 @@ export default function Settings() {
     if (actionName === 'Delete Account') {
       const confirmDelete = window.confirm("Are you absolutely sure you want to delete your account? This action cannot be undone and all your points and data will be lost forever.");
       if (!confirmDelete) return;
-      
+
       try {
         await deleteDoc(doc(db, 'users', user.uid));
         await deleteUser(auth.currentUser);
@@ -162,25 +172,25 @@ export default function Settings() {
     switch (activeTab) {
       case 'appearance':
         return (
-          <motion.section 
+          <motion.section
             key="appearance"
             initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} transition={{ duration: 0.3 }}
             className={styles.section}
           >
-            <h2 className={styles.sectionTitle}><div className={styles.iconWrapper}>🎨</div> Appearance</h2>
+            <h2 className={styles.sectionTitle}><div className={styles.iconWrapper}><Palette size={18} /></div> Appearance</h2>
             <SelectRow
-              icon="🌈" label="Theme" value={activeTheme}
+              icon={<SunMoon size={18} />} label="Theme" value={activeTheme}
               options={[
-                { value: 'regalia-noir', label: '👑 Regalia Noir' },
-                { value: 'regalia', label: '👑 Regalia' },
-                { value: 'metallic', label: '🌑 Metallic Black' },
-                { value: 'midnight', label: '🌌 Midnight Dark' },
+                { value: 'regalia-noir', label: 'Regalia Noir' },
+                { value: 'regalia', label: 'Regalia' },
+                { value: 'metallic', label: 'Metallic Black' },
+                { value: 'midnight', label: 'Midnight Dark' },
               ]}
               onChange={setTheme}
             />
             {activeTheme === 'regalia' && (
               <SelectRow
-                icon="✨" label="Golden Contrast" value={themeContrast || 'default'}
+                icon={<Sparkles size={18} />} label="Golden Contrast" value={themeContrast || 'default'}
                 options={[
                   { value: 'default', label: 'Default' },
                   { value: 'gold', label: 'Bolder Gold' },
@@ -189,7 +199,7 @@ export default function Settings() {
               />
             )}
             <SelectRow
-              icon="🔤" label="Text Size" value={textSize}
+              icon={<Type size={18} />} label="Text Size" value={textSize}
               options={[
                 { value: 'normal', label: 'Normal' },
                 { value: 'large', label: 'Large' },
@@ -201,84 +211,84 @@ export default function Settings() {
         );
       case 'accessibility':
         return (
-          <motion.section 
+          <motion.section
             key="accessibility"
             initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} transition={{ duration: 0.3 }}
             className={styles.section}
           >
-            <h2 className={styles.sectionTitle}><div className={styles.iconWrapper}>♿</div> Accessibility</h2>
+            <h2 className={styles.sectionTitle}><div className={styles.iconWrapper}><Accessibility size={18} /></div> Accessibility</h2>
             <ToggleRow
-              icon="🎞️" label="Reduce Motion" desc="Turns off animations and transitions"
+              icon={<Film size={18} />} label="Reduce Motion" desc="Turns off animations and transitions"
               checked={reducedMotion} onChange={setReducedMotion}
             />
             <ToggleRow
-              icon="🔲" label="High Contrast" desc="Increases contrast for better visibility"
+              icon={<Contrast size={18} />} label="High Contrast" desc="Increases contrast for better visibility"
               checked={highContrast} onChange={setHighContrast}
             />
           </motion.section>
         );
       case 'notifications':
         return (
-          <motion.section 
+          <motion.section
             key="notifications"
             initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} transition={{ duration: 0.3 }}
             className={styles.section}
           >
-            <h2 className={styles.sectionTitle}><div className={styles.iconWrapper}>🔔</div> Notifications</h2>
+            <h2 className={styles.sectionTitle}><div className={styles.iconWrapper}><Bell size={18} /></div> Notifications</h2>
             <ToggleRow
-              icon="📱" label="Daily Reminders" desc="Get a reminder to complete your eco-tasks"
+              icon={<Smartphone size={18} />} label="Daily Reminders" desc="Get a reminder to complete your eco-tasks"
               checked={notificationsEnabled} onChange={(val) => updateProfileSetting('notificationsEnabled', val)} disabled={saving}
             />
             <ToggleRow
-              icon="🔥" label="Streak Alerts" desc="Get warned before your streak expires"
+              icon={<Flame size={18} />} label="Streak Alerts" desc="Get warned before your streak expires"
               checked={streakAlerts} onChange={(val) => updateProfileSetting('streakAlerts', val)} disabled={saving}
             />
           </motion.section>
         );
       case 'privacy':
         return (
-          <motion.section 
+          <motion.section
             key="privacy"
             initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} transition={{ duration: 0.3 }}
             className={styles.section}
           >
-            <h2 className={styles.sectionTitle}><div className={styles.iconWrapper}>🔒</div> Privacy</h2>
+            <h2 className={styles.sectionTitle}><div className={styles.iconWrapper}><Lock size={18} /></div> Privacy</h2>
             <ToggleRow
-              icon="🌍" label="Show Real Name" desc="When off, other users see your display handle instead of your full name"
+              icon={<Globe2 size={18} />} label="Show Real Name" desc="When off, other users see your display handle instead of your full name"
               checked={publicProfile} onChange={(val) => updateProfileSetting('publicProfile', val)} disabled={saving}
             />
             <ToggleRow
-              icon="🏆" label="Show on Leaderboard" desc="Appear on global and group leaderboards"
+              icon={<Trophy size={18} />} label="Show on Leaderboard" desc="Appear on global and group leaderboards"
               checked={showOnLeaderboard} onChange={(val) => updateProfileSetting('showOnLeaderboard', val)} disabled={saving}
             />
           </motion.section>
         );
       case 'account':
         return (
-          <motion.section 
+          <motion.section
             key="account"
             initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} transition={{ duration: 0.3 }}
             className={styles.section}
           >
-            <h2 className={styles.sectionTitle}><div className={styles.iconWrapper}>⚙️</div> Account Actions</h2>
+            <h2 className={styles.sectionTitle}><div className={styles.iconWrapper}><Settings2 size={18} /></div> Account Actions</h2>
             <div className={styles.row}>
               <button className={styles.actionBtn} onClick={() => handleAction('Change Password')}>
-                <div className={styles.iconWrapper}>🔑</div> Change Password
+                <div className={styles.iconWrapper}><KeyRound size={18} /></div> Change Password
               </button>
             </div>
             <div className={styles.row}>
               <button className={styles.actionBtn} onClick={() => handleAction('Change Email')}>
-                <div className={styles.iconWrapper}>✉️</div> Change Email
+                <div className={styles.iconWrapper}><Mail size={18} /></div> Change Email
               </button>
             </div>
             <div className={styles.row}>
               <button className={styles.actionBtn} onClick={() => handleAction('Export Data')}>
-                <div className={styles.iconWrapper}>📥</div> Export My Data
+                <div className={styles.iconWrapper}><Download size={18} /></div> Export My Data
               </button>
             </div>
             <div className={`${styles.row} ${styles.dangerRow}`}>
               <button className={`${styles.actionBtn} ${styles.dangerText}`} onClick={() => handleAction('Delete Account')}>
-                <div className={styles.iconWrapper} style={{borderColor: 'rgba(239, 68, 68, 0.3)', background: 'rgba(239, 68, 68, 0.1)'}}>🗑️</div> Delete Account
+                <div className={styles.iconWrapper} style={{ borderColor: 'rgba(239, 68, 68, 0.3)', background: 'rgba(239, 68, 68, 0.1)' }}><Trash2 size={18} /></div> Delete Account
               </button>
             </div>
           </motion.section>
@@ -289,17 +299,17 @@ export default function Settings() {
 
   return (
     <div className={styles.page}>
-      
+
       {/* Epic Header Area */}
       <div className={styles.headerArea}>
         <div className={styles.headerContent}>
-          <motion.h1 
+          <motion.h1
             initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }}
             className={styles.title}
           >
             Settings
           </motion.h1>
-          <motion.p 
+          <motion.p
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2, duration: 0.6 }}
             className={styles.subtitle}
           >
@@ -310,7 +320,7 @@ export default function Settings() {
 
       <div className={styles.dashboardLayout}>
         {/* Navigation Sidebar */}
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.6, delay: 0.1 }}
           className={styles.sidebarNav}
         >
@@ -332,7 +342,7 @@ export default function Settings() {
             {renderContent()}
           </AnimatePresence>
 
-          <motion.p 
+          <motion.p
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.4, duration: 0.6 }}
             className={styles.note}
           >

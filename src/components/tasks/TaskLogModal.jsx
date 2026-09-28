@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { compressImageToBase64 } from '../../lib/imageUtils';
 import { useAuthStore } from '../../store/authStore';
-import { createSubmission, subscribeSubmission, awardPointsAndUpdateStreak } from '../../services/firestoreService';
+import { createSubmission, subscribeSubmission } from '../../services/firestoreService';
 import { verifyTaskPhoto } from '../../services/aiService';
 import toast from 'react-hot-toast';
 import PremiumIcon from '../common/PremiumIcon';
@@ -20,7 +20,7 @@ const VERIFICATION_STAGES = {
 };
 
 export default function TaskLogModal({ task, onClose, onSuccess }) {
-  const { user, profile } = useAuthStore();
+  const { user } = useAuthStore();
   const [photo, setPhoto] = useState(null);
   const [preview, setPreview] = useState(null);
   const [uploading, setUploading] = useState(false);
@@ -117,19 +117,23 @@ export default function TaskLogModal({ task, onClose, onSuccess }) {
           setStage(status);
           setReason(r || '');
 
-          // Award points on approval via client
-          if (status === 'approved' && profile) {
-            try {
-              const earned = task.points || 50;
-              await awardPointsAndUpdateStreak(user.uid, task.id, earned, {
-                co2Saved: task.co2 || 0,
-                waterSaved: task.water || 0,
-                treesEquivalent: task.waste || 0,
-              });
-              toast.success(<span>+{earned} points earned! <PremiumIcon icon={Leaf} color="emerald" size={16} /></span>);
-            } catch (err) {
-              console.error('[TaskLogModal] award failed', err);
-              toast.error(err.message || "Failed to award points.");
+          // Points are awarded through the idempotent awardSubmissionPoints —
+          // the same call the AI verification path makes, so closing this
+          // modal early can never lose the payout and a late snapshot can
+          // never double it.
+          if (status === 'approved') {
+            const { awardSubmissionPoints } = await import('../../services/firestoreService');
+            const result = await awardSubmissionPoints(user.uid, subId, task.points || 50, {
+              co2Saved: task.co2 || 0,
+              waterSaved: task.water || 0,
+              wasteSaved: task.waste || 0,
+            });
+            if (result.awarded) {
+              toast.success(<span>+{task.points} points earned! <PremiumIcon icon={Leaf} color="emerald" size={16} /></span>);
+            } else if (result.reason === 'already-awarded') {
+              toast.success(<span>+{task.points} points earned! <PremiumIcon icon={Leaf} color="emerald" size={16} /></span>);
+            } else if (result.reason === 'error') {
+              toast.error('Points could not be credited — contact support if this persists.');
             }
           }
 

@@ -1,24 +1,23 @@
 // src/components/hero/EcoHeroStatic.jsx
-// Lightweight SVG + CSS animation fallback for low-end devices and reduced-motion
+// WebGL-free Earth fallback: the real Blue Marble texture carried by CSS —
+// sphere shading, terminator, atmosphere glow — plus a slow horizon scroll.
+// Used on mobile, reduced-motion devices and as the 3D scene's Suspense face.
 import styles from './EcoHeroStatic.module.css';
 
 export default function EcoHeroStatic() {
   return (
-    <div className={styles.hero}>
-      <div className={styles.orb}>
-        <div className={styles.core}>
-          <span className={styles.emoji}>🌍</span>
+    <div className={styles.hero} aria-hidden="true">
+      <div className={styles.stars} />
+      <div className={styles.scene}>
+        <div className={styles.globe}>
+          <div className={styles.surface} />
+          <div className={styles.clouds} />
+          <div className={styles.shade} />
+          <div className={styles.atmoGlow} />
         </div>
-        <div className={styles.ring1} />
-        <div className={styles.ring2} />
-        <div className={styles.ring3} />
-        <div className={styles.particles}>
-          {['🌿', '💧', '☀️', '♻️', '🌱', '🍃'].map((e, i) => (
-            <span key={i} className={styles.particle} style={{ '--i': i }}>
-              {e}
-            </span>
-          ))}
-        </div>
+        <span className={`${styles.drift} ${styles.driftA}`} />
+        <span className={`${styles.drift} ${styles.driftB}`} />
+        <span className={`${styles.drift} ${styles.driftC}`} />
       </div>
     </div>
   );

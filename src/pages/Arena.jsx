@@ -6,10 +6,13 @@ import { generateArenaTrivia } from '../services/aiService';
 import { increment } from 'firebase/firestore';
 import toast from 'react-hot-toast';
 import styles from './Arena.module.css';
-import { Flame, Brain, Target, Zap, Clock, Coins, CheckCircle2, History, Sprout, Swords, Trophy, Lock, Unlock, ChevronRight, Leaf, Star, TrendingUp, Users, AlertCircle, ShieldCheck } from 'lucide-react';
+import { Flame, Brain, Target, Zap, Clock, Coins, CheckCircle2, History, Sprout, Swords, Trophy, Lock, Unlock, ChevronRight, Leaf, Star, TrendingUp, Users, AlertCircle, ShieldCheck, CandlestickChart, Dices } from 'lucide-react';
 import PremiumIcon from '../components/common/PremiumIcon';
 import { MOCK_TRIVIA } from '../constants/arenaData';
 import { useSettingsStore } from '../store/settingsStore';
+import PerpsDesk from '../components/arena/PerpsDesk';
+import { runMarketCycle } from '../services/oracleService';
+import Casino from '../components/casino/Casino';
 import {
   subscribeActiveMarkets,
   subscribeRecentMarkets,
@@ -17,6 +20,7 @@ import {
   fetchCryptoPrices,
   placeBetOnMarket,
   settleExpiredMarketsForUser,
+  sweepStaleMarkets,
   recalculateMultipliers,
   getOptionProbabilities,
   MIN_BET,
@@ -292,7 +296,7 @@ function MarketCard({ market, profile, selectedOption, setSelectedOption, betAmo
 }
 
 export default function Arena() {
-  const { profile } = useAuthStore();
+  const { profile, setProfile } = useAuthStore();
   const settings = useSettingsStore(s => s.settings) || {};
 
   const oracleOn  = settings.arenaOracleEnabled  ?? true;
@@ -301,14 +305,14 @@ export default function Arena() {
   const stakingOn = settings.arenaStakingEnabled ?? true;
 
   const TABS = [
+    ...(settings.perpsEnabled ?? true) ? [{ id: 'perps', label: 'Perps Trading', icon: CandlestickChart }] : [],
     ...(oracleOn  ? [{ id: 'oracle',   label: 'The Oracle',       icon: Target  }] : []),
-    ...(triviaOn  ? [{ id: 'trivia',   label: 'Trivia',           icon: Brain   }] : []),
-    ...(spinOn    ? [{ id: 'spin',     label: 'Spin to Win',      icon: Zap     }] : []),
+    ...((settings.casinoEnabled ?? true) ? [{ id: 'casino', label: 'Casino', icon: Dices }] : []),
     ...(stakingOn ? [{ id: 'staking',  label: 'Staking Pool',     icon: Sprout  }] : []),
     ...(oracleOn  ? [{ id: 'history',  label: 'Bets & History',   icon: History }] : []),
   ];
 
-  const [activeTab, setActiveTab] = useState(TABS[0]?.id || 'spin');
+  const [activeTab, setActiveTab] = useState(TABS[0]?.id || 'perps');
 
   // Oracle
   const [betAmounts, setBetAmounts]     = useState({});
@@ -340,6 +344,17 @@ export default function Arena() {
   // Staking
   const [stakeAmount, setStakeAmount]   = useState('');
   const [resolvingBetId, setResolvingBetId] = useState(null);
+
+  // Market cycle heartbeat — runs while the Arena is open on ANY tab: settle
+  // everything expired, then top the board back up with fresh markets. This
+  // is the engine that keeps the Oracle self-sustaining (Polymarket-style).
+  useEffect(() => {
+    runMarketCycle().catch(err => console.warn('[Oracle] Market cycle failed:', err));
+    const cycleTimer = setInterval(() => {
+      runMarketCycle().catch(err => console.warn('[Oracle] Market cycle failed:', err));
+    }, 90000);
+    return () => clearInterval(cycleTimer);
+  }, []);
 
   // Oracle — realtime: subscribe to the live market board the first time the
   // tab is opened, then keep odds/volumes fresh via onSnapshot as bets land.
@@ -607,21 +622,20 @@ export default function Arena() {
       {/* Ambient background */}
       <div className={styles.ambientBg} />
 
-      {/* Header */}
+      {/* Compact header — Stake-style: identity left, balance right */}
       <div className={styles.header}>
-        <div className={styles.headerBadge}>
-          <Swords size={16} />
-          <span>The Arena</span>
+        <div className={styles.headerLeft}>
+          <div className={styles.headerBadge}>
+            <Swords size={13} />
+            <span>The Arena</span>
+          </div>
+          <h1 className={styles.title}>Compete &amp; Conquer</h1>
+          <p className={styles.subtitle}>Tournaments, predictions, and high-stakes originals.</p>
         </div>
-        <h1 className={styles.title}>
-          <PremiumIcon icon={Flame} color="ruby" size={52} />
-          Compete & Conquer
-        </h1>
-        <p className={styles.subtitle}>High-stakes tournaments, predictions, and rewards await the bold.</p>
         {profile && (
           <div className={styles.balancePill}>
-            <PremiumIcon icon={Coins} color="gold" size={18} />
-            <span>{spendable} spendable pts</span>
+            <PremiumIcon icon={Coins} color="gold" size={17} />
+            <span>{spendable} pts</span>
           </div>
         )}
       </div>
@@ -641,7 +655,7 @@ export default function Arena() {
         ))}
       </div>
 
-      <AnimatePresence mode="wait">
+      <AnimatePresence initial={false}>
         <motion.div
           key={activeTab}
           initial={{ opacity: 0, y: 24 }}
@@ -650,6 +664,16 @@ export default function Arena() {
           transition={{ duration: 0.3, ease: 'easeOut' }}
           className={styles.tabContent}
         >
+
+          {/* ═══════════════ PERPS TRADING ═══════════════ */}
+          {activeTab === 'perps' && (
+            <PerpsDesk profile={profile} />
+          )}
+
+          {/* ═══════════════ CASINO ORIGINALS ═══════════════ */}
+          {activeTab === 'casino' && (
+            <Casino profile={profile} setProfile={setProfile} />
+          )}
 
           {/* ═══════════════ ORACLE ═══════════════ */}
           {activeTab === 'oracle' && (
@@ -763,93 +787,6 @@ export default function Arena() {
 
 
           {/* ═══════════════ TRIVIA ═══════════════ */}
-          {activeTab === 'trivia' && (
-            <div className={styles.triviaLobby}>
-              <div className={styles.triviaLobbyGlow} />
-              <div className={styles.triviaLobbyIcon}>
-                <PremiumIcon icon={Brain} color="sapphire" size={72} />
-              </div>
-              <h2 className={styles.triviaLobbyTitle}>Eco Brain Brawl</h2>
-              <p className={styles.triviaLobbyDesc}>
-                Test your environmental knowledge with AI-generated questions about sustainability, climate change, and eco news — fresh questions every round!
-              </p>
-              <div className={styles.triviaRules}>
-                <div className={styles.triviaRule}>
-                  <Coins size={20} style={{ color: '#f59e0b' }} />
-                  <span>100 pts entry fee</span>
-                </div>
-                <div className={styles.triviaRule}>
-                  <Star size={20} style={{ color: '#8b5cf6' }} />
-                  <span>50 pts per correct answer</span>
-                </div>
-                <div className={styles.triviaRule}>
-                  <Leaf size={20} style={{ color: '#10b981' }} />
-                  <span>Eco facts after each answer</span>
-                </div>
-              </div>
-              <button
-                className={styles.primaryBtn}
-                onClick={startTrivia}
-                disabled={loadingTrivia}
-              >
-                {loadingTrivia ? (
-                  <><span className={styles.btnSpinner} /> Generating questions...</>
-                ) : (
-                  <>Start Tournament <ChevronRight size={20} /></>
-                )}
-              </button>
-            </div>
-          )}
-
-          {/* ═══════════════ SPIN ═══════════════ */}
-          {activeTab === 'spin' && (
-            <div className={styles.spinContainer}>
-              <div className={styles.spinHeader}>
-                <h2 className={styles.spinTitle}>Wheel of Fortune</h2>
-                <p className={styles.spinSubtitle}>Spin for 250 pts · Win up to 1,000 pts instantly</p>
-              </div>
-
-              <div className={styles.wheelScene}>
-                {/* Pointer */}
-                <div className={styles.wheelPointer}>
-                  <div className={styles.wheelPointerInner} />
-                </div>
-                {/* Glow ring */}
-                <div className={`${styles.wheelRing} ${isSpinning ? styles.wheelRingSpinning : ''}`} />
-                {/* SVG Wheel */}
-                <WheelSVG rotation={spinRotation} isSpinning={isSpinning} />
-              </div>
-
-              {lastWin && !isSpinning && (
-                <motion.div
-                  initial={{ scale: 0.8, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  className={styles.spinResult}
-                  style={{ '--win-color': lastWin.seg.color }}
-                >
-                  {lastWin.value > 0 ? (
-                    <><Trophy size={24} /> You won <strong>{lastWin.value}</strong> pts!</>
-                  ) : (
-                    <><Flame size={24} /> Better luck next spin!</>
-                  )}
-                </motion.div>
-              )}
-
-              <button
-                className={`${styles.primaryBtn} ${styles.spinBtn}`}
-                onClick={handleSpin}
-                disabled={isSpinning}
-              >
-                {isSpinning ? (
-                  <><span className={styles.btnSpinner} /> Spinning...</>
-                ) : (
-                  <><Zap size={20} /> Spin (250 pts)</>
-                )}
-              </button>
-            </div>
-          )}
-
-          {/* ═══════════════ STAKING ═══════════════ */}
           {activeTab === 'staking' && (
             <div className={styles.stakingContainer}>
               <div className={styles.stakingHero}>

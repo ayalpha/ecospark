@@ -3,8 +3,8 @@ import { create } from 'zustand';
 
 const getPreferredTheme = () => {
   try {
-    return localStorage.getItem('ecospark-theme') || 'regalia';
-  } catch { return 'regalia'; }
+    return localStorage.getItem('ecospark-theme') || 'aurora';
+  } catch { return 'aurora'; }
 };
 
 const getPreferredMotion = () => {
@@ -34,14 +34,10 @@ export const CONTRASTS = [
 ];
 
 export const useUiStore = create((set, get) => ({
-  // AI Coach
+  // AI Agent (single unified companion — greeting is generated from the
+  // user's real profile + behaviour data on first open)
   coachOpen: false,
-  coachMessages: [
-    {
-      role: 'assistant',
-      content: "Hi! I'm your EcoSpark AI Coach 🌱 I can help you with eco tips, explain tasks, or motivate your streak. What's on your mind?",
-    },
-  ],
+  coachMessages: [],
   coachHasNewTip: false,
 
   // Theme & Accessibility
@@ -93,6 +89,9 @@ export const useUiStore = create((set, get) => ({
   appendCoachMessage: (message) =>
     set((s) => ({ coachMessages: [...s.coachMessages, message] })),
 
+  setCoachMessages: (messages) =>
+    set({ coachMessages: messages }),
+
   updateLastCoachMessage: (content) =>
     set((s) => {
       const msgs = [...s.coachMessages];
@@ -104,12 +103,7 @@ export const useUiStore = create((set, get) => ({
 
   clearCoachHistory: () =>
     set({
-      coachMessages: [
-        {
-          role: 'assistant',
-          content: "Hi! I'm your EcoSpark AI Coach 🌱 How can I help you today?",
-        },
-      ],
+      coachMessages: [],
     }),
 
   setTheme: (theme) => {

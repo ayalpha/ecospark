@@ -50,11 +50,21 @@ function NewsCard({ article, onClick }) {
   );
 }
 
-function NewsBoardInner() {
+function timeAgo(dateStr) {
+  if (!dateStr) return '';
+  const mins = Math.round((Date.now() - new Date(dateStr).getTime()) / 60000);
+  if (mins < 60) return `${Math.max(mins, 1)}m ago`;
+  const hrs = Math.round(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  return `${Math.round(hrs / 24)}d ago`;
+}
+
+function NewsBoardInner({ layout = 'grid' }) {
   const [articles, setArticles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selected, setSelected] = useState(null);
+  const column = layout === 'column';
 
   useEffect(() => {
     fetchGreenNews()
@@ -77,29 +87,58 @@ function NewsBoardInner() {
         )}
       </div>
 
-      {/* Mobile: horizontal scroll; Desktop: grid */}
-      <div className={loading ? styles.gridLoading : styles.grid}>
-        {loading
-          ? Array.from({ length: 4 }).map((_, i) => <NewsCardSkeleton key={i} />)
-          : error
-          ? (
-            <div className={styles.empty}>
-              <PremiumIcon icon={WifiOff} color="slate" size={32} />
-              <p>News is temporarily unavailable. Check back soon!</p>
-            </div>
-          )
-          : articles.length === 0
-          ? (
-            <div className={styles.empty}>
-              <PremiumIcon icon={Leaf} color="emerald" size={32} />
-              <p>No stories found. Try refreshing later.</p>
-            </div>
-          )
-          : articles.slice(0, 4).map((a, i) => (
-            <NewsCard key={i} article={a} onClick={setSelected} />
-          ))
-        }
-      </div>
+      {/* Column: compact rail; Grid: standard dashboard board */}
+      {column ? (
+        <div className={loading ? styles.gridLoading : styles.columnList}>
+          {loading
+            ? Array.from({ length: 3 }).map((_, i) => <NewsCardSkeleton key={i} />)
+            : error
+            ? (
+              <div className={styles.empty}>
+                <PremiumIcon icon={WifiOff} color="slate" size={28} />
+                <p>News is temporarily unavailable.</p>
+              </div>
+            )
+            : articles.slice(0, 6).map((a, i) => (
+              <button key={i} className={styles.columnItem} onClick={() => setSelected(a)}>
+                {a.image ? (
+                  <img src={a.image} alt="" loading="lazy" className={styles.columnThumb} />
+                ) : (
+                  <span className={styles.columnThumbPlaceholder}><PremiumIcon icon={Globe} color="sapphire" size={22} /></span>
+                )}
+                <span className={styles.columnText}>
+                  <span className={styles.columnSource}>{a.source?.name}</span>
+                  <span className={styles.columnTitle}>{a.title}</span>
+                  <span className={styles.columnTime}>{timeAgo(a.publishedAt)}</span>
+                </span>
+              </button>
+            ))
+          }
+        </div>
+      ) : (
+        <div className={loading ? styles.gridLoading : styles.grid}>
+          {loading
+            ? Array.from({ length: 4 }).map((_, i) => <NewsCardSkeleton key={i} />)
+            : error
+            ? (
+              <div className={styles.empty}>
+                <PremiumIcon icon={WifiOff} color="slate" size={32} />
+                <p>News is temporarily unavailable. Check back soon!</p>
+              </div>
+            )
+            : articles.length === 0
+            ? (
+              <div className={styles.empty}>
+                <PremiumIcon icon={Leaf} color="emerald" size={32} />
+                <p>No stories found. Try refreshing later.</p>
+              </div>
+            )
+            : articles.slice(0, 4).map((a, i) => (
+              <NewsCard key={i} article={a} onClick={setSelected} />
+            ))
+          }
+        </div>
+      )}
 
       <AnimatePresence>
         {selected && (
@@ -110,10 +149,10 @@ function NewsBoardInner() {
   );
 }
 
-export default function NewsBoard() {
+export default function NewsBoard({ layout }) {
   return (
     <ErrorBoundary fullPage={false} message="News board couldn't load, but the rest of your dashboard is working fine.">
-      <NewsBoardInner />
+      <NewsBoardInner layout={layout} />
     </ErrorBoundary>
   );
 }

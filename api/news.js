@@ -11,12 +11,17 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'GNews API key not configured' });
   }
 
+  // Topic rotation comes from the client so each "Load more" pulls a fresh
+  // slice of the news landscape instead of the same 8 stories again.
+  const topic = (req.query.topic || 'sustainability OR climate OR environment').slice(0, 120);
+  const max = Math.min(Math.max(parseInt(req.query.max, 10) || 10, 1), 10);
+
   try {
     const params = new URLSearchParams({
-      q: 'sustainability OR climate OR environment OR "eco-friendly" OR "green energy"',
+      q: topic,
       lang: 'en',
       country: 'in', // India focus for the student audience
-      max: '8',
+      max: String(max),
       sortby: 'publishedAt',
       apikey: apiKey,
     });
