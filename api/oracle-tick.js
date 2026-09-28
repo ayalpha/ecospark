@@ -134,6 +134,12 @@ function fmtCloseLabel(endTime) {
 function buildCryptoMarkets(prices, startIndex = 0) {
   const markets = [];
   let index = startIndex;
+  // Mirrors oracleService.baseOptions() — the serverless bundle can't import
+  // from the client service file.
+  const baseOptions = () => [
+    { id: 'yes', label: 'YES', totalStaked: 0, initialMultiplier: 2.0, multiplier: 2.0 },
+    { id: 'no', label: 'NO', totalStaked: 0, initialMultiplier: 2.0, multiplier: 2.0 },
+  ];
   for (const coin of COINS) {
     const p = prices?.[coin.id];
     if (!p || typeof p.usd !== 'number') continue;
