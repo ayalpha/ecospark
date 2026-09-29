@@ -162,6 +162,7 @@ export default function Messages() {
   const typingLastWriteRef = useRef(0);
   const typingClearTimerRef = useRef(null);
   const openLastReadRef = useRef(null); // lastReadAt watermark at thread open (unread divider)
+  const unreadAtOpenRef = useRef(false); // was the chat marked unread when opened?
   const longPressTimerRef = useRef(null);
   const seenForChatRef = useRef(null);
 
@@ -201,6 +202,7 @@ export default function Messages() {
     setMessages([]); setChatDoc(null); setReplyTo(null); setActionMsgId(null);
     setReactMsgId(null); setEditingMsgId(null); setNewBelow(0);
     openLastReadRef.current = null;
+    unreadAtOpenRef.current = false;
     seenForChatRef.current = null;
     nearBottomRef.current = true;
     setLiveOther(null);
@@ -209,7 +211,11 @@ export default function Messages() {
     const unsubChat = subscribeChatDoc(chatId, (doc0) => {
       setChatDoc(doc0);
       if (openLastReadRef.current === null && doc0) {
+        // Capture the pre-read state ONCE: the watermark for the divider and
+        // whether this chat had the opener marked unread (a never-opened
+        // chat has no watermark at all but is still "all new").
         openLastReadRef.current = doc0.lastReadAt?.[myId] || 0;
+        unreadAtOpenRef.current = (doc0.unreadBy || []).includes(myId);
       }
     });
     return () => { unsubMsgs(); unsubChat(); };
@@ -290,8 +296,9 @@ export default function Messages() {
   const seen = !!(lastOwn && otherReadAt >= msOf(lastOwn.createdAt) - 1000);
 
   // Unread divider: first message newer than the watermark captured at open
+  // (or anywhere in a chat that was unread when opened and had no watermark)
   let dividerBeforeId = null;
-  if (openLastReadRef.current > 0 && chatDoc) {
+  if (chatDoc && (openLastReadRef.current > 0 || unreadAtOpenRef.current)) {
     const firstNew = messages.find((m) => msOf(m.createdAt) > openLastReadRef.current && m.senderId !== myId);
     dividerBeforeId = firstNew?.id || null;
   }
