@@ -155,7 +155,7 @@ export async function getAdminStats() {
     const totalUsersSnap = await getCountFromServer(collection(db, 'users'));
     const totalPostsSnap = await getCountFromServer(collection(db, 'community'));
     const approvedSubmissionsSnap = await getCountFromServer(query(collection(db, 'submissions'), where('status', '==', 'approved')));
-    
+
     return {
       totalUsers: totalUsersSnap.data().count,
       totalPosts: totalPostsSnap.data().count,
@@ -163,7 +163,11 @@ export async function getAdminStats() {
     };
   } catch (error) {
     console.error("Error fetching stats:", error);
-    // Fallback if getCountFromServer fails due to older firebase versions or permissions
+    // A real outage (quota exhausted, permissions) must NOT quietly display
+    // zeros — that reads as "the platform is empty" to an admin. Re-throw so
+    // the page's toast explains the failure; only fall back for genuinely
+    // unsupported environments.
+    if (error?.code === 'resource-exhausted' || error?.code === 'permission-denied') throw error;
     return { totalUsers: 0, totalPosts: 0, approvedSubmissions: 0 };
   }
 }

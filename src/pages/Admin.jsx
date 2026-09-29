@@ -110,15 +110,14 @@ export default function Admin() {
   // Default role to 'student' if undefined/null to prevent unauthorized access
   const userRole = profile?.role || 'student';
   const isAuthorized = userRole === 'teacher' || userRole === 'admin' || userRole === 'owner';
-  
-  if (profile && !isAuthorized) {
-    return <Navigate to="/" replace />;
-  }
 
+  // NOTE: every hook must run before any conditional return below — an early
+  // return that skipped this effect used to crash the page with a
+  // "rendered fewer hooks" error while auth was resolving.
   useEffect(() => {
-    if (!profile) return;
+    if (!profile || !isAuthorized) return;
     loadTabData(activeTab);
-  }, [activeTab, profile]);
+  }, [activeTab, profile, isAuthorized]);
 
   const loadTabData = async (tab) => {
     setLoading(true);
@@ -499,6 +498,12 @@ export default function Admin() {
       setLoading(false);
     }
   };
+
+  // Role gate lives AFTER every hook — an early return above this line would
+  // skip hooks and crash the page on the student → staff transition.
+  if (profile && !isAuthorized) {
+    return <Navigate to="/" replace />;
+  }
 
   return (
     <div className={styles.page}>
