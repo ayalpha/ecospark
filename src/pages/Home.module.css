@@ -118,6 +118,9 @@
   .heroCard {
     display: block;
     min-height: 540px;
+    /* the Earth's apparent size tracks the canvas height — without a cap the
+       card stretched to the news column's height and the planet went huge */
+    max-height: 640px;
   }
 }
 

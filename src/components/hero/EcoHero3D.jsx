@@ -35,22 +35,23 @@ function HeroCanvas({ exploring, onContextLost }) {
   useEffect(() => () => { glRef.current?.forceContextLoss?.(); }, []);
 
   return (
-    <Canvas
-      style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', display: 'block' }}
-      camera={{ position: [0, 0, 4.15], fov: 44 }}
-      gl={{ antialias: true, alpha: false, powerPreference: 'high-performance' }}
-      dpr={typeof window !== 'undefined' && window.devicePixelRatio ? Math.min(window.devicePixelRatio, 1.75) : 1}
-      frameloop={exploring ? 'never' : 'always'}
-      onCreated={({ gl }) => {
-        glRef.current = gl;
-        // A lost context mid-session is recoverable: swallow the default
-        // "canvas lost" handling and rebuild the whole scene once.
-        gl.domElement.addEventListener('webglcontextlost', (e) => {
-          e.preventDefault();
-          onContextLost?.();
-        }, { once: true });
-      }}
-    >
+    <div className={styles.canvasHost}>
+      <Canvas
+        style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', display: 'block' }}
+        camera={{ position: [0, 0, 4.15], fov: 44 }}
+        gl={{ antialias: true, alpha: false, powerPreference: 'high-performance' }}
+        dpr={typeof window !== 'undefined' && window.devicePixelRatio ? Math.min(window.devicePixelRatio, 1.75) : 1}
+        frameloop={exploring ? 'never' : 'always'}
+        onCreated={({ gl }) => {
+          glRef.current = gl;
+          // A lost context mid-session is recoverable: swallow the default
+          // "canvas lost" handling and rebuild the whole scene once.
+          gl.domElement.addEventListener('webglcontextlost', (e) => {
+            e.preventDefault();
+            onContextLost?.();
+          }, { once: true });
+        }}
+      >
       {/* Opaque deep-space backdrop: no transparent-canvas compositing, so
           hover can no longer trigger backdrop-invalidation flicker, and the
           card interior reads as one continuous window instead of a box-in-box. */}
@@ -67,7 +68,8 @@ function HeroCanvas({ exploring, onContextLost }) {
           mipmapBlur
         />
       </EffectComposer>
-    </Canvas>
+      </Canvas>
+    </div>
   );
 }
 
