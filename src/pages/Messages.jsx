@@ -101,21 +101,33 @@ export default function Messages() {
   const isHandle = typeof rawHandle === 'string' && rawHandle.startsWith('@');
   const [activeChatId, setActiveChatId] = useState(!isHandle ? rawHandle : null);
   const [resolving, setResolving] = useState(isHandle);
+  const [resolveError, setResolveError] = useState(null);
+  const [retryNonce, setRetryNonce] = useState(0);
 
+  // @username → chat resolution, with a HARD timeout: under Firestore quota
+  // backoff these queries can pend for minutes, and a spinner that never
+  // ends is worse than an honest "try again".
   useEffect(() => {
-    if (!rawHandle) { setActiveChatId(null); setResolving(false); return undefined; }
-    if (!rawHandle.startsWith('@')) { setActiveChatId(rawHandle); setResolving(false); return undefined; }
+    if (!rawHandle) { setActiveChatId(null); setResolving(false); setResolveError(null); return undefined; }
+    if (!rawHandle.startsWith('@')) { setActiveChatId(rawHandle); setResolving(false); setResolveError(null); return undefined; }
     let alive = true;
-    setResolving(true); setActiveChatId(null);
-    resolveUsername(rawHandle.slice(1)).then((uid) => {
+    setResolving(true); setActiveChatId(null); setResolveError(null);
+    const timeout = setTimeout(() => {
       if (!alive) return;
-      if (!uid) { setResolving(false); return; }
+      setResolving(false);
+      setResolveError('The database is slow to respond right now. Give it a moment and try again.');
+    }, 15000);
+    resolveUsername(rawHandle.slice(1)).then((uid) => {
+      if (!alive) return null;
+      if (!uid) { setResolving(false); setResolveError('No one goes by that username.'); return null; }
       return createOrGetChat(myId, uid).then((id) => {
         if (alive) { setActiveChatId(id); setResolving(false); }
       });
-    }).catch(() => { if (alive) setResolving(false); });
-    return () => { alive = false; };
-  }, [rawHandle, myId]);
+    }).catch(() => {
+      if (alive) { setResolving(false); setResolveError('Could not open that chat. Try again.'); }
+    }).finally(() => clearTimeout(timeout));
+    return () => { alive = false; clearTimeout(timeout); };
+  }, [rawHandle, myId, retryNonce]);
 
   const chatId = activeChatId;
 
@@ -578,6 +590,12 @@ export default function Messages() {
           <div className={styles.threadEmpty}>
             <span className={styles.sendSpinner} style={{ width: 22, height: 22, borderColor: 'rgba(45,212,167,0.3)', borderTopColor: '#2DD4A7' }} />
             <h3>Opening chat…</h3>
+          </div>
+        ) : !chatId && resolveError ? (
+          <div className={styles.threadEmpty}>
+            <h3>Couldn't open that chat</h3>
+            <p>{resolveError}</p>
+            <button className={styles.emptyCta} onClick={() => setRetryNonce((n) => n + 1)} type="button">Try again</button>
           </div>
         ) : !chatId || (!activeChat && !otherUserId) ? (
           <div className={styles.threadEmpty}>
