@@ -24,7 +24,7 @@ import {
 import { createOrGetChat, updateUserProfile } from '../../services/firestoreService';
 import { pinnedAchievements, computeAchievements, profileCompletion } from '../../lib/achievements';
 import { getLedger } from '../../services/walletService';
-import { getProfileSuggestions } from '../../services/aiService';
+import { getProfileSuggestions, profileSuggestionsSignature } from '../../services/aiService';
 import { useAuthStore } from '../../store/authStore';
 import { collection, query, where, limit as qLimit, getDocs } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
