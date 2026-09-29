@@ -12,9 +12,9 @@ function vercelDevApi() {
     name: 'vercel-dev-api',
     configureServer(server) {
       const wrap = (handler) => (req, res, next) => {
-        // Vercel functions receive (req, res) with query pre-parsed, and they
-        // use Express-style response helpers — shim those onto connect's raw
-        // Node response.
+        // Vercel functions receive (req, res) with query pre-parsed and a
+        // pre-parsed JSON body, and they use Express-style response helpers —
+        // shim those onto connect's raw Node request/response.
         const url = new URL(req.url, 'http://localhost');
         req.query = Object.fromEntries(url.searchParams);
         if (!res.status) res.status = (code) => { res.statusCode = code; return res; };
@@ -22,10 +22,20 @@ function vercelDevApi() {
           res.setHeader('Content-Type', 'application/json');
           res.end(JSON.stringify(obj));
         };
-        Promise.resolve(handler(req, res)).catch((err) => {
+        const run = () => Promise.resolve(handler(req, res)).catch((err) => {
           console.error('[dev-api]', err);
           if (!res.headersSent) res.status(500).json({ error: err.message });
         });
+        if (req.method === 'POST' && req.body === undefined) {
+          let raw = '';
+          req.on('data', (c) => { raw += c; });
+          req.on('end', () => {
+            try { req.body = raw ? JSON.parse(raw) : {}; } catch { req.body = raw; }
+            run();
+          });
+        } else {
+          run();
+        }
       };
       server.middlewares.use('/api/news', wrap(async (req, res) => {
         const handler = (await import('./api/news.js')).default;
@@ -37,6 +47,14 @@ function vercelDevApi() {
       }));
       server.middlewares.use('/api/oracle-tick', wrap(async (req, res) => {
         const handler = (await import('./api/oracle-tick.js')).default;
+        return handler(req, res);
+      }));
+      server.middlewares.use('/api/follow', wrap(async (req, res) => {
+        const handler = (await import('./api/follow.js')).default;
+        return handler(req, res);
+      }));
+      server.middlewares.use('/api/username', wrap(async (req, res) => {
+        const handler = (await import('./api/username.js')).default;
         return handler(req, res);
       }));
     },

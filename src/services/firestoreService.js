@@ -495,6 +495,7 @@ export async function getPublicProfile(userId) {
   return {
     id: snap.id,
     displayName: data.displayName,
+    username: data.username || null,
     photoURL: data.photoURL,
     lifetimePoints: data.lifetimePoints || data.points || 0,
     spendableBalance: data.spendableBalance ?? data.points ?? 0,
@@ -504,6 +505,13 @@ export async function getPublicProfile(userId) {
     totalTasksCompleted: data.totalTasksCompleted || 0,
     totalCO2Saved: data.totalCO2Saved || 0,
     totalWaterSaved: data.totalWaterSaved || 0,
+    totalWasteSaved: data.totalWasteSaved || 0,
+    bio: data.bio || '',
+    role: data.role || 'student',
+    groupId: data.groupId || null,
+    website: data.website || null,
+    learn: data.learn || null,
+    lastActiveAt: data.lastActiveAt || null,
     badges: data.badges || [],
     unlockedFrames: data.unlockedFrames || [],
     activeFrame: data.activeFrame || null,
@@ -876,7 +884,7 @@ export function subscribeMessages(chatId, callback) {
   });
 }
 
-export async function sendMessage(chatId, senderId, text, mediaUrl = null, mediaType = null) {
+export async function sendMessage(chatId, senderId, text, mediaUrl = null, mediaType = null, replyTo = null) {
   const msgRef = doc(collection(db, 'chats', chatId, 'messages'));
   const payload = {
     senderId,
@@ -887,16 +895,26 @@ export async function sendMessage(chatId, senderId, text, mediaUrl = null, media
     payload.mediaUrl = mediaUrl;
     payload.mediaType = mediaType;
   }
-  
+  if (replyTo) {
+    // Quoted context for the Instagram-style reply. Kept denormalized on the
+    // message so rendering never needs a second read.
+    payload.replyTo = {
+      id: replyTo.id || null,
+      name: String(replyTo.name || '').slice(0, 40),
+      text: String(replyTo.text || '').slice(0, 140),
+      hasMedia: !!replyTo.hasMedia,
+    };
+  }
+
   await setDoc(msgRef, payload);
-  
+
   // Find other participants to mark as unread and notify
   const chatSnap = await getDoc(doc(db, 'chats', chatId));
   let unreadBy = [];
   if (chatSnap.exists()) {
     const participants = chatSnap.data().participants || [];
     unreadBy = participants.filter(p => p !== senderId);
-    
+
     // Send notifications to receivers
     for (const receiverId of unreadBy) {
       createNotification(receiverId, 'message', {
@@ -906,12 +924,90 @@ export async function sendMessage(chatId, senderId, text, mediaUrl = null, media
       }).catch(console.error);
     }
   }
-  
+
   await updateDoc(doc(db, 'chats', chatId), {
     lastMessage: text || (mediaType === 'video' ? 'Sent a video' : 'Sent an image'),
     unreadBy,
     updatedAt: serverTimestamp(),
   });
+
+  // NOTE: no lastReadAt write here — the thread's read effect already covers
+  // the sender, and every extra same-doc write invites write-contention
+  // failures on the free tier. Typing signals need no clearing either; they
+  // expire by freshness (4s window).
+  return msgRef.id;
+}
+
+/** Live chat metadata (typing indicators, per-user lastReadAt, unreadBy). */
+export function subscribeChatDoc(chatId, callback) {
+  return onSnapshot(doc(db, 'chats', chatId), (snap) => {
+    callback(snap.exists() ? { id: snap.id, ...snap.data() } : null);
+  }, () => callback(null));
+}
+
+/** Per-user read watermark on the chat doc. Drives the "Seen" receipt and
+    the unread divider. Chat updates are participant-gated by the rules. */
+export async function markChatSeen(chatId, userId) {
+  try {
+    await updateDoc(doc(db, 'chats', chatId), {
+      [`lastReadAt.${userId}`]: Date.now(),
+    });
+  } catch (err) {
+    console.error('Failed to mark chat seen:', err);
+  }
+}
+
+/** Typing signal: a fresh timestamp on the chat doc; consumers treat it as
+    active for ~4s. Debounce at the call site (~every 2s while typing). */
+export async function setChatTyping(chatId, userId, isTyping) {
+  try {
+    await updateDoc(doc(db, 'chats', chatId), {
+      [`typing.${userId}`]: isTyping ? Date.now() : 0,
+    });
+  } catch { /* typing is cosmetic — never surface failures */ }
+}
+
+/** Toggle the caller's reaction on a message. reactions = { emoji: [uids] }.
+    Read-modify-write of the whole map keeps the rules check simple
+    (hasOnly 'reactions'). */
+export async function toggleMessageReaction(chatId, messageId, emoji, userId) {
+  const msgRef = doc(db, 'chats', chatId, 'messages', messageId);
+  const snap = await getDoc(msgRef);
+  if (!snap.exists()) return;
+  const reactions = snap.data().reactions || {};
+  const forEmoji = new Set(reactions[emoji] || []);
+  if (forEmoji.has(userId)) forEmoji.delete(userId);
+  else forEmoji.add(userId);
+  const next = { ...reactions };
+  if (forEmoji.size === 0) delete next[emoji];
+  else next[emoji] = [...forEmoji];
+  await updateDoc(msgRef, { reactions: next });
+}
+
+/** Receipts: add the reader to readBy on messages they haven't read yet
+    (their own messages are skipped — a sender is implicitly caught up).
+    Capped at the most recent 60 so ancient threads stay cheap. */
+export async function markThreadMessagesRead(chatId, userId) {
+  try {
+    const q = query(
+      collection(db, 'chats', chatId, 'messages'),
+      orderBy('createdAt', 'desc'),
+      limit(60),
+    );
+    const snap = await getDocs(q);
+    const batch = writeBatch(db);
+    let ops = 0;
+    snap.docs.forEach((d) => {
+      const x = d.data();
+      if (x.senderId === userId) return;
+      if (Array.isArray(x.readBy) && x.readBy.includes(userId)) return;
+      batch.update(d.ref, { readBy: arrayUnion(userId) });
+      ops += 1;
+    });
+    if (ops > 0) await batch.commit();
+  } catch (err) {
+    console.error('Failed to mark messages read:', err);
+  }
 }
 
 export async function markChatAsRead(chatId, userId) {

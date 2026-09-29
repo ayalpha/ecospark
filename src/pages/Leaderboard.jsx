@@ -6,11 +6,12 @@ import { useAuthStore } from '../store/authStore';
 import { useSettingsStore } from '../store/settingsStore';
 import Avatar from '../components/common/Avatar';
 import { subscribeLeaderboard } from '../services/firestoreService';
+import { subscribeMyFollowing } from '../services/followService';
 import { useUser } from '../lib/useUser';
 import { GoldMedal, SilverMedal, BronzeMedal } from '../components/common/Medals';
 import PremiumIcon from '../components/common/PremiumIcon';
 import { REWARDS_DB } from '../constants/rewards';
-import { Flame, Zap, Trophy, AlertTriangle, Leaf, ShieldAlert, BadgeInfo } from 'lucide-react';
+import { Flame, Zap, Trophy, AlertTriangle, Leaf, ShieldAlert, BadgeInfo, Users } from 'lucide-react';
 import styles from './Leaderboard.module.css';
 
 const RANK_STYLE = {
@@ -162,6 +163,28 @@ export default function Leaderboard() {
   useEffect(() => {
     setLoading(true);
     setError(null);
+    // Following tab: fetch my followings, then their leaderboard docs sorted
+    // client-side (no composite index needed on the free tier).
+    if (tab === 'following') {
+      if (!user?.uid) { setEntries([]); setLoading(false); return undefined; }
+      let alive = true;
+      const unsub = subscribeMyFollowing(user.uid, async (followingSet) => {
+        if (!alive) return;
+        if (!followingSet.size) { setEntries([]); setLoading(false); return; }
+        const uids = [...followingSet].slice(0, 30);
+        const { collection: coll, getDocs: gd, query: qq, where: ww } = await import('firebase/firestore');
+        const { db: firestore } = await import('../lib/firebase');
+        try {
+          const snap = await gd(qq(coll(firestore, 'leaderboard'), ww('userId', 'in', uids)));
+          const rows = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+          rows.sort((a, b) => (b.weeklyPoints || 0) - (a.weeklyPoints || 0));
+          if (alive) { setEntries(rows); setLoading(false); }
+        } catch (e) {
+          if (alive) { setError(e.message); setLoading(false); }
+        }
+      });
+      return unsub;
+    }
     const unsub = subscribeLeaderboard(tab, null, (data) => {
       setEntries(data);
       setLoading(false);
@@ -171,7 +194,7 @@ export default function Leaderboard() {
       setLoading(false);
     });
     return unsub;
-  }, [tab]);
+  }, [tab, user?.uid]);
 
   const bannedUsers = settings?.bannedUsers || [];
   const displayEntries = entries
@@ -197,6 +220,7 @@ export default function Leaderboard() {
         {[
           { key: 'weekly', label: <span style={{display:'flex', alignItems:'center', gap:'6px'}}><PremiumIcon icon={Zap} color="gold" size={16} /> Weekly Points</span> },
           { key: 'streak', label: <span style={{display:'flex', alignItems:'center', gap:'6px'}}><PremiumIcon icon={Flame} color="ruby" size={16} /> Highest Streak</span> },
+          { key: 'following', label: <span style={{display:'flex', alignItems:'center', gap:'6px'}}><PremiumIcon icon={Users} color="emerald" size={16} /> Following</span> },
         ].map((t) => (
           <button
             key={t.key}

@@ -255,8 +255,15 @@ export default function App() {
                     <Route path="/community" element={<Community />} />
                     <Route path="/profile" element={<Profile />} />
                     <Route path="/user/:id" element={<UserProfile />} />
+                    {/* Vanity profile URLs: /@username. Dynamic params must own
+                        a full segment, so the @ lives in the value; static
+                        routes above always rank higher, and non-@ segments
+                        fall through to the home redirect below. */}
+                    <Route path="/:handle" element={<UserProfile />} />
                     <Route path="/messages" element={<Messages />} />
-                    <Route path="/messages/:chatId" element={<Messages />} />
+                    {/* :handle accepts either the chat id or /@username — the
+                        component resolves handles to (or creates) the chat. */}
+                    <Route path="/messages/:handle" element={<Messages />} />
                     <Route path="/notifications" element={<Notifications />} />
                     <Route path="/settings" element={<Settings />} />
                     <Route path="/admin" element={<Admin />} />

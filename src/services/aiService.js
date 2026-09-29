@@ -588,3 +588,83 @@ Respond ONLY with a valid JSON array. Schema:
   const jsonStr = content.replace(/```json?\n?/g, '').replace(/```/g, '').trim();
   return JSON.parse(jsonStr);
 }
+
+// ─── PROFILE COACH (personalized completion card) ───────────────────────────
+//
+// One non-streaming JSON call that turns the user's REAL profile numbers into
+// the three pieces the completion card shows: a tone-adaptive headline, a
+// ready-to-adopt bio (only when theirs is empty), and 2–3 next steps mapped to
+// the actually-missing items. Same contract as the Agent: everything grounded
+// in the provided data, nothing invented. Returns null on ANY failure — the
+// caller falls back to the static missing-items list, so the card never breaks
+// when the key is missing, quota is out, or the model hiccups.
+
+const profileSuggestionCache = new Map(); // signature -> suggestions | null
+
+export function profileSuggestionsSignature(profile, missing) {
+  return [
+    profile?.id || 'me',
+    (profile?.totalTasksCompleted || 0),
+    (profile?.streak || 0),
+    Math.round((profile?.lifetimePoints || 0) / 100),
+    (profile?.followersCount || 0),
+    !!profile?.photoURL,
+    (profile?.bio || '').trim().length > 0,
+    (missing || []).join('|'),
+  ].join('~');
+}
+
+export async function getProfileSuggestions(profile, missing = []) {
+  const sig = profileSuggestionsSignature(profile, missing);
+  if (profileSuggestionCache.has(sig)) return profileSuggestionCache.get(sig);
+
+  try {
+    const apiKey = import.meta.env.VITE_GROQ_API_KEY;
+    if (!apiKey) throw new Error('Groq API key missing');
+
+    // Prompt lives in profileCoachPrompt.js — one source of truth shared with
+    // the offline tone test (local-tools/test-profile-coach.mjs).
+    const { PROFILE_COACH_MODEL, buildProfileCoachPrompt } = await import('./profileCoachPrompt.js');
+    const { system, user } = buildProfileCoachPrompt(profile, missing);
+
+    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        model: PROFILE_COACH_MODEL,
+        messages: [
+          { role: 'system', content: system },
+          { role: 'user', content: user },
+        ],
+        temperature: 0.65,
+        reasoning_effort: 'low',
+        max_tokens: 900,
+        response_format: { type: 'json_object' }
+      })
+    });
+
+    if (!response.ok) throw new Error(`Profile coach API error: ${response.status}`);
+    const data = await response.json();
+    const content = data.choices?.[0]?.message?.content;
+    if (!content) throw new Error('No content from AI');
+
+    const parsed = JSON.parse(content);
+    const out = {
+      headline: typeof parsed.headline === 'string' ? parsed.headline.slice(0, 90) : null,
+      bio: typeof parsed.bio === 'string' ? parsed.bio.slice(0, 160) : null,
+      steps: Array.isArray(parsed.steps)
+        ? parsed.steps.filter((s) => typeof s === 'string' && s.trim()).slice(0, 3)
+        : [],
+    };
+    if (!out.headline && out.steps.length === 0) throw new Error('Empty suggestions');
+    profileSuggestionCache.set(sig, out);
+    return out;
+  } catch (err) {
+    console.warn('[aiService] profile suggestions unavailable:', err?.message);
+    profileSuggestionCache.set(sig, null); // don't re-burn the quota within a session
+    return null;
+  }
+}

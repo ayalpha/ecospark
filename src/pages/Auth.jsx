@@ -13,6 +13,9 @@ import {
 } from 'firebase/auth';
 import { auth, googleProvider } from '../lib/firebase';
 import { createUserProfile, processReferral } from '../services/firestoreService';
+import {
+  setUsername, checkUsernameAvailable, usernameFormatError, normalizeUsername,
+} from '../services/usernameService';
 import { useSettingsStore } from '../store/settingsStore';
 import toast from 'react-hot-toast';
 import { Leaf, Globe2, Trophy, Sparkles, ShieldCheck, MailCheck } from 'lucide-react';
@@ -23,13 +26,31 @@ export default function Auth() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const refCode = searchParams.get('ref') || '';
-  const [form, setForm] = useState({ name: '', email: '', password: '', referralCode: refCode });
+  const [form, setForm] = useState({ name: '', email: '', password: '', username: '', referralCode: refCode });
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
+  const [usernameCheck, setUsernameCheck] = useState({ status: 'idle' });
   const [justVerified, setJustVerified] = useState(searchParams.get('verified') === '1');
   const { settings } = useSettingsStore();
 
   const isSignupDisabled = settings?.maintenanceMode || !settings?.allowSignups;
+
+  /* live availability probe for the signup username (debounced; works
+     pre-auth — the API's check action is public-safe) */
+  useEffect(() => {
+    if (mode !== 'signup') return undefined;
+    const next = normalizeUsername(form.username);
+    if (!next) { setUsernameCheck({ status: 'idle' }); return undefined; }
+    const formatError = usernameFormatError(next);
+    if (formatError) { setUsernameCheck({ status: 'invalid', message: formatError }); return undefined; }
+    setUsernameCheck({ status: 'checking' });
+    const t = setTimeout(() => {
+      checkUsernameAvailable(next).then((r) => {
+        setUsernameCheck(r.available ? { status: 'ok' } : { status: 'taken', message: r.message });
+      }).catch(() => setUsernameCheck({ status: 'idle' }));
+    }, 350);
+    return () => clearTimeout(t);
+  }, [form.username, mode]);
 
   // If the user lands back here with mode=verifyEmail&oobCode=…, consume the
   // code in-app — this is the path where the email link points directly at the
@@ -67,6 +88,11 @@ export default function Auth() {
   const validate = () => {
     const e = {};
     if (mode === 'signup' && !form.name.trim()) e.name = 'Name is required';
+    if (mode === 'signup' && form.username.trim()) {
+      const formatError = usernameFormatError(normalizeUsername(form.username));
+      if (formatError) e.username = formatError;
+      else if (usernameCheck.status === 'taken') e.username = usernameCheck.message;
+    }
     if (!form.email.trim() || !/\S+@\S+\.\S+/.test(form.email)) e.email = 'Valid email required';
     if (form.password.length < 6) e.password = 'Password must be at least 6 characters';
     setErrors(e);
@@ -101,6 +127,18 @@ export default function Auth() {
           photoURL: null,
         });
         if (form.referralCode) await processReferral(cred.user.uid, form.referralCode);
+
+        // Claim the requested @handle while the fresh token is valid. A
+        // failure here must not lose the account — it can be claimed from
+        // the profile later.
+        const wanted = normalizeUsername(form.username);
+        if (wanted) {
+          try {
+            await setUsername(wanted);
+          } catch (uErr) {
+            toast.error(`${uErr?.message || 'Username could not be claimed'} — you can claim it from your profile later.`, { duration: 8000 });
+          }
+        }
 
         // Sign them out until they verify
         await auth.signOut();
@@ -326,6 +364,30 @@ export default function Auth() {
                         autoComplete="name"
                       />
                       {errors.name && <p className={styles.error}>{errors.name}</p>}
+                    </div>
+                    <div className={styles.field}>
+                      <label className={styles.label} htmlFor="auth-username">Username <span className={styles.optional}>(optional)</span></label>
+                      <div className={styles.usernameRow}>
+                        <span className={styles.usernamePrefix}>@</span>
+                        <input
+                          id="auth-username"
+                          type="text"
+                          className={`${styles.input} ${styles.usernameField} ${errors.username || usernameCheck.status === 'taken' || usernameCheck.status === 'invalid' ? styles.inputError : ''} ${usernameCheck.status === 'ok' ? styles.inputOk : ''}`}
+                          placeholder="eco_warrior"
+                          value={form.username}
+                          onChange={(e) => setForm({ ...form, username: e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, '') })}
+                          maxLength={20}
+                          autoComplete="off"
+                        />
+                      </div>
+                      {(errors.username || usernameCheck.status !== 'idle') && (
+                        <p className={`${styles.hint} ${errors.username || usernameCheck.status === 'taken' || usernameCheck.status === 'invalid' ? styles.hintBad : styles.hintOk}`}>
+                          {errors.username
+                            || (usernameCheck.status === 'checking' ? 'Checking…'
+                              : usernameCheck.status === 'ok' ? `ecosprk.vercel.app/@${form.username} is available!`
+                              : usernameCheck.message || '')}
+                        </p>
+                      )}
                     </div>
                     <div className={styles.field}>
                       <label className={styles.label} htmlFor="auth-referral">Referral Code <span className={styles.optional}>(optional)</span></label>

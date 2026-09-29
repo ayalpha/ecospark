@@ -1,10 +1,11 @@
 // src/components/layout/ActivityTracker.jsx
-// Invisible component with two jobs:
+// Invisible component with three jobs:
 //   1. per-user behaviour memory (page time, clicks) for the EcoSpark Agent
 //   2. leaderboard mirroring — the economy writes points with increment() from
 //      many services, so rankings are kept current by watching the live
 //      profile and syncing /leaderboard whenever a ranked value actually
 //      changes (one code path covers every flow, present and future).
+//   3. presence heartbeat — lastActiveAt powers "Active now" in Messages.
 
 import { useEffect, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
@@ -25,6 +26,15 @@ export default function ActivityTracker() {
   useEffect(() => {
     if (user?.uid) trackRoute(location.pathname);
   }, [location.pathname, user?.uid]);
+
+  // Presence heartbeat — one tiny write a minute while signed in.
+  useEffect(() => {
+    if (!user?.uid) return undefined;
+    const beat = () => updateDoc(doc(db, 'users', user.uid), { lastActiveAt: Date.now() }).catch(() => {});
+    beat();
+    const t = setInterval(beat, 60_000);
+    return () => clearInterval(t);
+  }, [user?.uid]);
 
   // Leaderboard mirror
   const lbPrev = useRef(null);

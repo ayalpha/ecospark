@@ -63,7 +63,7 @@ function NavItem({ item, isActive, children, onClick }) {  return (
 
 export default function Sidebar() {
   const { profile } = useAuthStore();
-  const { unreadCount } = useUiStore();
+  const { unreadCount, setUnreadCount } = useUiStore();
   const settings = useSettingsStore(s => s.settings) || {};
   const arenaEnabled = settings.arenaEnabled ?? true;
   const navigate = useNavigate();

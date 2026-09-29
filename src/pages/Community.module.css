@@ -287,3 +287,115 @@
 }
 .empty span { font-size: 48px; }
 .empty p { margin: 0; font-size: 0.9rem; line-height: 1.6; }
+
+/* ── v2 layout: main feed + suggestions rail ───────────────────────────── */
+
+.layout {
+  display: flex;
+  gap: 18px;
+  align-items: flex-start;
+}
+
+.mainCol {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.rail {
+  width: 300px;
+  flex-shrink: 0;
+  display: none;
+  position: sticky;
+  top: 84px;
+}
+
+@media (min-width: 1100px) {
+  .rail { display: block; }
+}
+
+.railCard {
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--card-radius);
+  padding: 16px;
+}
+
+.railTitle {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: var(--text-xs);
+  font-weight: var(--font-bold);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+  margin: 0 0 12px;
+}
+
+.railTitle svg { color: #2DD4A7; }
+
+.railList { display: flex; flex-direction: column; gap: 8px; }
+
+.railLoading, .railEmpty {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--text-xs);
+  color: var(--color-text-tertiary);
+  padding: 8px 0;
+}
+
+/* ── feed tabs ─────────────────────────────────────────────────────────── */
+
+.feedTabs {
+  display: flex;
+  gap: 4px;
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  padding: 4px;
+  width: max-content;
+}
+
+.feedTab {
+  all: unset;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--text-xs);
+  font-weight: var(--font-semibold);
+  color: var(--color-text-tertiary);
+  padding: 7px 16px;
+  border-radius: var(--radius-full);
+  transition: var(--transition-micro);
+}
+
+.feedTab:hover { color: var(--color-text); }
+
+.feedTabOn {
+  color: #04231A !important;
+  background: linear-gradient(135deg, #2DD4A7, #14B8A6) !important;
+  font-weight: var(--font-bold);
+}
+
+.empty .btnPrimary {
+  font-size: var(--text-xs);
+  font-weight: var(--font-bold);
+  color: #04231A;
+  background: linear-gradient(135deg, #2DD4A7, #14B8A6);
+  border: none;
+  border-radius: var(--radius-full);
+  padding: 8px 16px;
+  cursor: pointer;
+}
+
+.spin { animation: cSpin 1s linear infinite; }
+@keyframes cSpin { to { transform: rotate(360deg); } }
+
+@media (max-width: 900px) {
+  .page { padding-bottom: calc(var(--bottombar-height, 64px) + 32px); }
+}

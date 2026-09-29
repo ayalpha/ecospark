@@ -23,8 +23,8 @@ export default function Notifications() {
       await markNotificationRead(notif.id);
     }
     
-    if (notif.type === 'follow' && notif.payload?.followerId) {
-      navigate(`/user/${notif.payload.followerId}`);
+    if (notif.type === 'follow' && (notif.payload?.actorId || notif.payload?.followerId)) {
+      navigate(`/user/${notif.payload.actorId || notif.payload.followerId}`);
     } else if (notif.type === 'message' && notif.payload?.chatId) {
       navigate(`/messages/${notif.payload.chatId}`);
     } else if (notif.type === 'streak') {
@@ -100,8 +100,12 @@ export default function Notifications() {
               <div className={styles.content}>
                 <h4>{notif.type === 'follow' ? 'New Follower' : notif.type === 'message' ? 'New Message' : 'Alert'}</h4>
                 <p>
-                  {notif.type === 'follow' && <strong>{notif.payload?.followerName} </strong>}
-                  {notif.payload?.message || 'You have a new notification.'}
+                  {notif.type === 'follow' && (
+                    <strong>{notif.payload?.actorName || notif.payload?.followerName || 'Someone'} </strong>
+                  )}
+                  {notif.type === 'follow'
+                    ? 'started following you.'
+                    : notif.payload?.message || 'You have a new notification.'}
                 </p>
                 <span className={styles.time}>{formatTime(notif.createdAt)}</span>
               </div>

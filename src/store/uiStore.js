@@ -144,4 +144,7 @@ export const useUiStore = create((set, get) => ({
 
   setNotifications: (notifications) =>
     set({ notifications, unreadCount: notifications.filter((n) => !n.read).length }),
+
+  // Sidebar chat badge (set from the conversations subscription)
+  setUnreadCount: (count) => set({ unreadCount: count }),
 }));

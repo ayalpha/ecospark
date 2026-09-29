@@ -52,7 +52,16 @@ service cloud.firestore {
 
     function touchesProtectedFields() {
       return request.resource.data.diff(resource.data).affectedKeys().hasAny([
-        'role', 'banned'
+        'role', 'banned',
+        // Follow counters are owned by api/follow.js (Admin SDK, one atomic
+        // transaction per follow/unfollow). A user must never be able to set
+        // their own — it would be trivial to forge popularity.
+        'followersCount', 'followingCount',
+        // The @username handle and its 3-per-30-days change ledger are owned
+        // by api/username.js: uniqueness is enforced by /usernames claim docs
+        // in one server transaction, and the quota must not be resettable
+        // client-side.
+        'username', 'usernameChanges',
       ]);
     }
 
@@ -113,12 +122,66 @@ service cloud.firestore {
       allow delete: if isStaff();
     }
 
-    // ── LEADERBOARD (public read, server-written) ─────────────────────────
+    // ── LEADERBOARD (public read, values must mirror the user doc) ────────
     // Was writable by the row's owner, which meant points could be forged here
-    // even once /users was locked.
+    // even once /users was locked. The row is still written client-side (the
+    // ActivityTracker mirror and the task-award transaction both write it), so
+    // the owner keeps limited self-access — but the row can never report MORE
+    // than the owner's /users doc:
+    //   • a ranked value may move only by the same delta as the user doc in
+    //     the same batch (the award-transaction pattern), or
+    //   • land at/below the user doc's post-write value (the mirror pattern),
+    //   • or not move at all (housekeeping writes: photo, groupId, …).
+    // All checks anchor to the user doc's POST-write state (getAfter), so the
+    // award transaction — which bumps both docs in one batch — passes even
+    // when the row was briefly stale. Staff keep full access.
     match /leaderboard/{userId} {
       allow read: if isAuthenticated();
-      allow create, update: if isStaff();
+
+      function lbUserAfter() {
+        return getAfter(/databases/$(database)/documents/users/$(userId)).data;
+      }
+
+      function lbCreateOk() {
+        let u = lbUserAfter();
+        let d = request.resource.data;
+        return d.userId == request.auth.uid
+          && (!('points' in d) || d.points <= u.get('lifetimePoints', u.get('points', 0)))
+          && (!('weeklyPoints' in d) || d.weeklyPoints <= u.get('weeklyPoints', 0))
+          && (!('streak' in d) || d.streak <= u.get('streak', 0))
+          && (!('displayName' in d) || d.displayName == u.get('displayName', 'EcoUser'));
+      }
+
+      function lbUpdateOk() {
+        let uB = get(/databases/$(database)/documents/users/$(userId)).data;
+        let uA = lbUserAfter();
+        let d = request.resource.data;
+        let changed = request.resource.data.diff(resource.data).affectedKeys();
+        // Only the mirror's own fields may ever change on an update.
+        let keysOk = changed.hasOnly([
+          'userId', 'displayName', 'photoURL', 'points', 'weeklyPoints',
+          'streak', 'groupId', 'showOnLeaderboard', 'updatedAt',
+        ]);
+        let pointsOk = !changed.hasAny(['points'])
+          || d.points <= uA.get('lifetimePoints', uA.get('points', 0))
+          || ('points' in resource.data
+              && d.points - resource.data.points
+                 == uA.get('lifetimePoints', uA.get('points', 0))
+                    - uB.get('lifetimePoints', uB.get('points', 0)));
+        let weeklyOk = !changed.hasAny(['weeklyPoints'])
+          || d.weeklyPoints <= uA.get('weeklyPoints', 0)
+          || ('weeklyPoints' in resource.data
+              && d.weeklyPoints - resource.data.weeklyPoints
+                 == uA.get('weeklyPoints', 0) - uB.get('weeklyPoints', 0));
+        let streakOk = !changed.hasAny(['streak'])
+          || d.streak == uA.get('streak', 0);
+        let nameOk = !changed.hasAny(['displayName'])
+          || d.displayName == uA.get('displayName', 'EcoUser');
+        return d.userId == request.auth.uid && keysOk && pointsOk && weeklyOk && streakOk && nameOk;
+      }
+
+      allow create: if isStaff() || (isSelf(userId) && lbCreateOk());
+      allow update: if isStaff() || (isSelf(userId) && lbUpdateOk());
       allow delete: if isStaff();
     }
 
@@ -295,16 +358,26 @@ service cloud.firestore {
       allow delete: if isStaff();
     }
 
-    // ── FOLLOWS ────────────────────────────────────────────────────────────
-    // Doc id is `${followerId}_${followingId}`; a user may only create the edge
-    // where they are the follower.
+    // ── FOLLOWS (social graph) ──────────────────────────────────────────────
+    // Deterministic id `{followerId}_{followingId}` makes duplicate edges
+    // impossible. All writes go through api/follow.js (Admin SDK — rules are
+    // bypassed there), because one follow must atomically update counters on
+    // TWO user docs that no client is allowed to touch. Clients get read-only
+    // access: the social graph is public information, like on any social app.
     match /follows/{followId} {
       allow read: if isAuthenticated();
-      allow create: if isAuthenticated() &&
-        request.resource.data.followerId == request.auth.uid;
-      allow delete: if isAuthenticated() &&
-        resource.data.followerId == request.auth.uid;
-      allow update: if false;
+      allow create, update, delete: if false;
+    }
+
+    // ── USERNAMES (handle claim docs) ───────────────────────────────────────
+    // /usernames/{name} → { uid } backs the /@name profile URLs. The doc for a
+    // handle is created and released ONLY by api/username.js in the same
+    // transaction that updates the owner's users doc — that transaction is
+    // what makes two users claiming one handle impossible. Clients can read
+    // the claims (public info, like follows) but never write.
+    match /usernames/{username} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if false;
     }
     // ── SETTINGS ───────────────────────────────────────────────────────────
     // Public read: the landing page and maintenance gate read this pre-auth.
@@ -340,11 +413,19 @@ service cloud.firestore {
         // You may only send as yourself, and only into a chat you are in.
         allow create: if isChatParticipant(chatId) &&
           request.resource.data.senderId == request.auth.uid;
-        // Editing is limited to reactions and read receipts; message text is
-        // immutable so history cannot be rewritten after the fact.
-        allow update: if isChatParticipant(chatId) &&
+        // Two disjoint update surfaces:
+        //   • any participant may add reactions or read receipts — content
+        //     keys untouched;
+        //   • ONLY the sender may edit or soft-delete their own message
+        //     (text/media swap within the app's edit window). Nobody — not
+        //     even the other participant — can rewrite someone else's words.
+        allow update: if isChatParticipant(chatId) && (
           request.resource.data.diff(resource.data).affectedKeys()
-            .hasOnly(['reactions', 'readBy', 'editedAt', 'deleted']);
+            .hasOnly(['reactions', 'readBy']) ||
+          (resource.data.senderId == request.auth.uid &&
+           request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['text', 'mediaUrl', 'mediaType', 'isEdited', 'editedAt', 'deleted', 'deletedAt']))
+        );
         allow delete: if isAuthenticated() &&
           resource.data.senderId == request.auth.uid;
       }
