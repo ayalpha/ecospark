@@ -14,8 +14,10 @@
 /* Epic Header Area */
 .headerArea {
   position: relative;
-  padding: 32px;
-  margin: -32px -32px 24px;
+  /* negative margins must mirror the shell's --content-padding exactly —
+     hardcoding 32px overflowed phones, where the shell clamps to 16px */
+  padding: max(var(--content-padding), 20px);
+  margin: calc(-1 * var(--content-padding)) calc(-1 * var(--content-padding)) 24px;
   background: radial-gradient(circle at 10% 0%, rgba(var(--color-primary-rgb), 0.2) 0%, transparent 50%),
               linear-gradient(135deg, rgba(124, 58, 237, 0.12) 0%, rgba(31, 164, 99, 0.10) 60%, transparent 100%);
   background-size: 200% 200%;

@@ -1080,7 +1080,8 @@
 /* ── responsive: mobile slides the thread over the rail ──────────────────── */
 
 @media (max-width: 760px) {
-  .container { height: calc(100vh - 24px); margin: 12px 0; max-height: none; }
+  /* end the shell ABOVE the fixed bottom tab bar so the composer stays tappable */
+  .container { height: calc(100vh - 24px - var(--bottombar-height, 64px)); margin: 12px 0; max-height: none; }
 
   .rail { width: 100%; }
   .thread {

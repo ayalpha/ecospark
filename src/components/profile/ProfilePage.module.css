@@ -419,11 +419,17 @@ button.stat:hover { border-color: var(--color-border-strong); }
   display: flex;
   gap: 4px;
   border-bottom: 1px solid var(--color-border);
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
 }
+
+.tabs::-webkit-scrollbar { display: none; }
 
 .tab {
   all: unset;
   cursor: pointer;
+  flex-shrink: 0;
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -434,6 +440,10 @@ button.stat:hover { border-color: var(--color-border-strong); }
   border-bottom: 2px solid transparent;
   margin-bottom: -1px;
   transition: var(--transition-micro);
+}
+
+@media (max-width: 480px) {
+  .tab { padding: 9px 10px; font-size: var(--text-xs); gap: 5px; }
 }
 
 .tab:hover { color: var(--color-text); }
